@@ -1,0 +1,37 @@
+// NOTE: List of pre-selected names for pawns.
+//       - Odds  -> Female Names
+//       - Evens -> Male Names
+// TODO: Add different names for differnet pawn archetypes.
+pub const PAWN_NAMES: &'static [&'static str] = &[
+    "Hurmugith Stronghide", "Ermmus Xuam",
+    "Vatraethra Platefeet", "Gadaec Trolltank",
+    "Kutdrehilda Merryarm", "Forferlug Dragonbane",
+    "Gitgroserd Hammerhand", "Ebnom Zekdezrum",
+    "Glasgribena Deephood", "Bhardrom Leatherborn",
+    "Khoulomora Bottleguard", "Meldain Redoz",
+    "Kardryn Bonebelly", "Urmgurn Joscale",
+    "Erinmebella Blackmane", "Baerdrak Treasureshield",
+    "Skastroda Bouldergranite", "Henmaek Ironcloak",
+    "Eddryn Boulderbelt", "Benrigg Aoy",
+    "Hakrideth Grumblejaw", "Doldain Dukded",
+    "Dekgradrid Blazingflayer", "Thergrum Shehleid",
+    "Brodawynn Warmtoe", "Kartharn Fisttrack",
+    "Lesslyl Strongdigger", "Bharnom Blessedmail",
+    "Rynselle Thundergranite", "Daermiir Ein",
+    "Einlyl Battlebane", "Brammus Gergelbi",
+    "Sarniss Grumblejaw", "Benmun Caskbasher",
+    "Nysnera Frozenhandle", "Ragadin Dulbreln",
+    "Jatebelle Blazingblade", "Muirrak Hepvunthihk",
+    "Throveastr Leadgrip", "Krumnum Tryanire",
+    "Arnora Strongsunder", "Kramgrom Hahkohr",
+    "Glasdrulyn Snowstone", "Berkohm Suem",
+    "Nasnyl Blazingflayer", "Muirdal Tromzarkingu",
+    "Khurdrustr Rubyforged", "Erindrerlig Nightbeard",
+    "Gymnura Mountainbender", "Gernam Warcleaver",
+    "Kaitrielle Leadforge", "Grammir Chelbulmu",
+    "Gymmyla Rubyforged", "Ermgus Deathwing",
+    "Harraehulda Blessedshaper", "Addohr Longforge",
+    "Noralgebelyn Cavebeard", "Rangrim Hiltenduft",
+    "Dimla Runeforge", "Gruzzon Coalbelt",
+    "Dworgeda Flintbraid", "Thalbrek Zenibrar",
+];
