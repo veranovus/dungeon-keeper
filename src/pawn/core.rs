@@ -63,7 +63,7 @@ impl Position {
     }
 
     // NOTE: Returns the every possible adjected successor position.
-    pub fn successors(&self, grid: &Grid) -> Vec<(Position, u32)> {
+    pub fn successors(&self, world: &world::World) -> Vec<(Position, u32)> {
         // NOTE: Create a vector to store possible successors.
         let mut vec: Vec<Position> = Vec::with_capacity(8);
         
@@ -85,8 +85,9 @@ impl Position {
                     },
                 );
                  
-                // NOTE: If the successor is not a solid tile add it to the vector.
-                if !grid.has_vertex(pos) {
+                // NOTE: If the successor is not a solid tile and if
+                //       it is not occupied, add it to the vector.
+                if !world.is_solid_tile(pos) && world.get_entity(pos).is_none() {
                     vec.push(pos.into());
                 }
             }
@@ -198,6 +199,22 @@ pub fn move_pawn(
     }
 
     return false;
+}
+
+// NOTE: Finds the shortest path from the pawn's position to
+//       target. Caller has to remove the initial position from
+//       the vector if a path is found.
+pub fn pawn_find_path(
+    position: Position,
+    target: Position,
+    world: &world::World,
+) -> Option<(Vec<Position>, u32)> {
+    return astar(
+        &position, 
+        |p| p.successors(&world),
+        |p| p.distance(&target), 
+        |p| *p == target
+    );
 }
 
 // NOTE: Process every pawns turn.

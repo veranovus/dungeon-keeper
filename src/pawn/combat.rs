@@ -6,6 +6,8 @@ use super::prelude::*;
 pub mod prelude {
     pub use super::{
         Health,
+        DamageType,
+        Resistance,
     };
 }
 

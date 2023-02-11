@@ -1,10 +1,10 @@
-use bevy::prelude::*;
+use std::collections::VecDeque;
 
-use pathfinding::prelude::*;
+use bevy::prelude::*;
 
 use log::info;
 
-use crate::{pawn::prelude::*, util::cursor, world};
+use crate::{pawn::{prelude::*, core}, util::cursor, world};
 
 use super::component::*;
 
@@ -35,26 +35,23 @@ fn move_order(
 
             let target: Position = world::normalize_to_world_coordinates(cursor_pos.world).into();
 
-            // NOTE: Find the path from the pawn's position to target.
-            let result = astar(
-                position, 
-                |p| p.successors(&world.grid),
-                |p| p.distance(&target), 
-                |p| *p == target
-            );
+            let result = core::pawn_find_path(*position, target, &world);
 
             match result {
                 None => {
                     info!("Ignored move order, no possible path for given location.");
                 },
-                Some((path, _cost)) => {
-                    for point in path {
-                        task_queue.queue.push_back(Task::Move(point.into()));
-                    }
-
+                Some((mut path, _cost)) => {
                     // NOTE: Remove the starting position since
                     //       pawn is already on that tile.
-                    task_queue.queue.pop_front();
+                    path.remove(0);
+
+                    // NOTE: Convert path into a VecDeque from
+                    //       Vec, and push the task to the pawn.
+                    task_queue.queue.push_back(Task::Move(MoveTask {
+                        path: VecDeque::from(path),
+                        target,
+                    }));
                 },
             }
         }
