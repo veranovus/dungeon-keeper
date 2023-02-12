@@ -7,6 +7,9 @@ use crate::{
 
 pub struct InspectorPlugin;
 
+// NOTE: Size of inspector panel
+pub const INSPECTOR_PANEL_SIZE: f32 = 200.0;
+
 impl Plugin for InspectorPlugin {
     fn build(&self, app: &mut App) {
         app.add_system_to_stage(CoreStage::PostUpdate, pawn_inspector);
@@ -18,8 +21,9 @@ fn pawn_inspector(
     query: Query<(&Selectable, &Name, &Health, &Alignment), With<Pawn>>
 ) {
     egui::SidePanel::left("pawn_inspector")
-        .min_width(200.0)
-        .max_width(200.0)
+        .min_width(INSPECTOR_PANEL_SIZE)
+        .max_width(INSPECTOR_PANEL_SIZE)
+        .exact_width(INSPECTOR_PANEL_SIZE)
         .resizable(false)
         .show(egui_context.ctx_mut(), |ui| {
             ui.heading("Inspector");

@@ -1,10 +1,10 @@
 use bevy::prelude::*;
-
 use pathfinding::prelude::*;
-
+use log::info;
 use noise::{BasicMulti, NoiseFn, Perlin};
+use rand::{Rng, rngs::StdRng, SeedableRng};
 
-use super::tile::{prelude::*, self};
+use super::tile::prelude::*;
 use crate::{tileset, globals::MAP_SIZE};
 
 pub struct GenerationPlugin;
@@ -24,19 +24,190 @@ pub const GENERATION_CAVE_SIZE: f64 = 3.50;
 // NOTE: Threshold that decides which values are considered empty.
 pub const GENERATION_CAVE_TRESHOLD: f64 = 0.12;
 
+// NOTE: Minimum distance that two seperate resources could be.
+pub const MINIMUM_RESOURCE_DISTANCE: f32 = 8.0;
+
+// NOTE: How much distance reduced on each maximum attempt.
+pub const RESOURCE_DISTANCE_REDUCTION: f32 = 0.5;
+
+// NOTE: Maximum tries for a resource location
+pub const MAXIMUM_RESOURCE_ITERATION: usize = 15;
+
+#[allow(dead_code)]
+// NOTE: Calculates the score for a given tile. This will be
+//       used for future resoureces, currently unused.
+fn calculate_position_score(
+    pos: (usize, usize), 
+    grid: &Grid,
+) -> usize {
+    let mut score = 0;
+
+    // NOTE: Calculate the score in x axis.
+    for i in 0..2 {
+        let mut pos = pos;
+        let modifier: i32 = if i == 0 { -1 } else { 1 };
+
+        while grid.has_vertex(pos) {
+            pos.0 += modifier as usize;
+            score += 1;
+        }
+    }
+
+    // NOTE: Calculate the score in y axis.
+    for i in 0..2 {
+        let mut pos = pos;
+        let modifier: i32 = if i == 0 { -1 } else { 1 };
+
+        while grid.has_vertex(pos) {
+            pos.1 += modifier as usize;
+            score += 1;
+        }
+    }
+
+    return score;
+}
+
+// NOTE: Check distance between two resources, and returns a score.
+fn calculate_resource_score(
+    pos: (usize, usize),
+    res: &Vec<(usize, usize)>,
+) -> f32 {
+    let mut small: f32 = f32::MAX;
+
+    for other in res {
+        let diff = (
+            (pos.0 as i32 - other.0 as i32).abs(),
+            (pos.1 as i32 - other.1 as i32).abs(),
+        );
+
+        let distance: f32 = f32::sqrt(
+            (diff.0.pow(2) + diff.1.pow(2)) as f32
+        );
+
+        if distance < small {
+            small = distance;
+        }
+    }
+
+    return small;
+}
+
+// NOTE: Picks a random position from the grid
+fn pick_random_tile(
+    rng: &mut StdRng,
+    res: &Vec<(usize, usize)>,
+    grid: &Grid,
+) -> (usize, usize) {
+    let mut iter = 0;
+    let mut distance = MINIMUM_RESOURCE_DISTANCE;
+
+    loop {
+        let pos = (
+            rng.gen_range(0..MAP_SIZE.0),
+            rng.gen_range(0..MAP_SIZE.0),
+        );
+    
+        let score = calculate_resource_score(pos, res);
+    
+        if grid.has_vertex(pos) && !res.contains(&pos) && score > distance {
+            return pos;
+        } else {
+            iter += 1;
+
+            if iter == MAXIMUM_RESOURCE_ITERATION {
+                info!(
+                    "Failed to find a suitable resource position
+                     during world generation with distance `{}`.", 
+                    distance
+                );
+
+                distance -= RESOURCE_DISTANCE_REDUCTION;
+                iter = 0;
+            }
+        }
+    }
+}
+
+// NOTE: Add note, maybe make it also spread to empty tiles?
+fn spread_resource(
+    commands: &mut Commands,
+    rng: &mut StdRng,
+    res: &mut Vec<(usize, usize)>,
+    tileset: &tileset::Tileset,
+    grid: &Grid,
+    pos: (usize, usize),
+    material: ResourceMaterial,
+    ratio: f64,
+) {
+    if ratio < 0.0 {
+        return;
+    }
+
+    for y in -1..=1_i32 {
+        for x in -1..=1_i32 {
+            if x.abs() == y.abs() {
+                continue;
+            }
+
+            let spread = rng.gen_bool(ratio);
+
+            let pos = (
+                if (pos.0 as i32 + x) < 0 {
+                    continue;
+                } else {
+                    (pos.0 as i32 + x) as usize
+                },
+                if (pos.1 as i32 + y) < 0 {
+                    continue;
+                } else {
+                    (pos.1 as i32 + y) as usize
+                },
+            );
+
+            if !spread || !grid.has_vertex(pos) || res.contains(&pos) {
+                continue;
+            }
+
+            res.push(pos);
+
+            super::tile::spawn_tile(
+                commands, 
+                tileset, 
+                pos, 
+                TileState::Solid, 
+                material,
+            );
+
+            spread_resource(
+                commands, 
+                rng, 
+                res, 
+                tileset, 
+                grid, 
+                pos, 
+                material,
+                ratio - material.ratio_reduction_rate(),
+            );
+        }
+    }
+}
+
 // NOTE: Generates a random world at startup using a perlin noise.
 //       This function also sets up the `World` resource.
 fn generate_world(
     mut commands: Commands,
     tileset: Res<tileset::Tileset>,
 ) {
+    // NOTE: Setup rng.
+    let mut rng = StdRng::seed_from_u64(GENERATION_SEED as u64);
+
+    // NOTE: Generate the perlin noise.
+    let noise = BasicMulti::<Perlin>::new(GENERATION_SEED);
+
     // NOTE: Create a vector to store all the solid tile positions.
     let mut world: Vec<(usize, usize)> = Vec::with_capacity(
         MAP_SIZE.0 * MAP_SIZE.1
     );
-
-    // NOTE: Generate the perlin noise.
-    let noise = BasicMulti::<Perlin>::new(GENERATION_SEED);
 
     for y in 0..(MAP_SIZE.1) {
         for x in 0..(MAP_SIZE.0) {
@@ -46,25 +217,79 @@ fn generate_world(
                 (y as f64) / MAP_SIZE.1 as f64 * GENERATION_CAVE_SIZE,
             ];
 
-            let solid = noise.get(position) <= GENERATION_CAVE_TRESHOLD;
-
-            let material = ResourceMaterial::Dirt;
-            let state = if solid {
-                // NOTE: Push solid tile position to grid
+            // NOTE: Push solid tile position to grid
+            if noise.get(position) <= GENERATION_CAVE_TRESHOLD {
                 world.push((x, y));
+            }
+        }
+    }
 
-                // NOTE: Create tile as solid.
+    // NOTE: Create the world grid.
+    let grid = world.into_iter().collect::<Grid>();
+
+    // NOTE: Setup resource count.
+    let resources: [(usize, ResourceMaterial); 2] = [
+        (rng.gen_range(6..10), ResourceMaterial::Iron),
+        (rng.gen_range(3..7), ResourceMaterial::Gold),
+    ];
+
+    // NOTE: Vector to store exhausted resource positions.
+    let mut exhausted: Vec<(usize, usize)> = vec![];
+
+    // Generate resources.
+    for i in 0..2 {
+        let res = resources[i];
+        for _ in 0..res.0 {
+            let pos = pick_random_tile(&mut rng, &exhausted, &grid);
+
+            exhausted.push(pos);
+
+            super::tile::spawn_tile(
+                &mut commands, 
+                &tileset, 
+                pos, 
+                TileState::Solid, 
+                res.1,
+            );
+
+            spread_resource(
+                &mut commands, 
+                &mut rng, 
+                &mut exhausted, 
+                &tileset, 
+                &grid, 
+                pos, 
+                res.1,
+                res.1.ratio(),
+            );
+        }
+    }
+
+    // Create non-resource tiles
+    for y in 0..(MAP_SIZE.1) {
+        for x in 0..(MAP_SIZE.0) {
+            let pos = (x, y);
+
+            if exhausted.contains(&pos) {
+                continue;
+            }
+
+            let state = if grid.has_vertex(pos) {
                 TileState::Solid
             } else {
-                // NOTE: Create tile as empty.
                 TileState::Empty
             };
 
-            // Create tile entity
-            tile::spawn_tile(
+            let material = if rng.gen_bool(0.5) {
+                ResourceMaterial::Rock
+            } else {
+                ResourceMaterial::Dirt
+            };
+
+            super::tile::spawn_tile(
                 &mut commands, 
                 &tileset, 
-                (x, y), 
+                pos, 
                 state, 
                 material,
             );
@@ -73,7 +298,7 @@ fn generate_world(
 
     // NOTE: Setup world resource.
     commands.insert_resource(super::World {
-        grid: world.into_iter().collect::<Grid>(),
+        grid,
         entities: vec![None; MAP_SIZE.0 * MAP_SIZE.1]
     });
 }

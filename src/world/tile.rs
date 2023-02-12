@@ -13,6 +13,7 @@ pub mod prelude {
 }
 
 #[allow(dead_code)]
+#[derive(Clone, Copy)]
 pub enum TileState {
     Empty,
     Solid,
@@ -33,6 +34,7 @@ pub struct Tile {
 }
 
 #[allow(dead_code)]
+#[derive(Clone, Copy)]
 pub enum ResourceMaterial {
     Dirt,
     Rock,
@@ -51,6 +53,28 @@ impl ResourceMaterial {
             ResourceMaterial::Iron => Color::hex("AAA8bA").unwrap(),
             ResourceMaterial::Gold => Color::hex("FFD700").unwrap(),
             ResourceMaterial::Crystal => Color::hex("DE10DA").unwrap(),
+        }
+    }
+
+    pub fn ratio(&self) -> f64 {
+        match self {
+            ResourceMaterial::Dirt => 0.00,
+            ResourceMaterial::Rock => 0.00,
+            ResourceMaterial::Coal => 0.90,
+            ResourceMaterial::Iron => 0.80,
+            ResourceMaterial::Gold => 0.60,
+            ResourceMaterial::Crystal => 0.40,
+        }
+    }
+
+    pub fn ratio_reduction_rate(&self) -> f64 {
+        match self {
+            ResourceMaterial::Dirt => 0.00,
+            ResourceMaterial::Rock => 0.00,
+            ResourceMaterial::Coal => 0.10,
+            ResourceMaterial::Iron => 0.15,
+            ResourceMaterial::Gold => 0.20,
+            ResourceMaterial::Crystal => 0.20,
         }
     }
 }

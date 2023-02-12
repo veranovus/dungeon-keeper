@@ -1,4 +1,3 @@
-mod material;
 pub mod generation;
 pub mod tile;
 

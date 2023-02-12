@@ -1,4 +1,4 @@
-mod inspector;
+pub mod inspector;
 
 use bevy::prelude::*;
 

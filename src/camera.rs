@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use log::error;
 
-use crate::globals::{WINDOW_SIZE, SPRITE_SIZE, MAP_SIZE};
+use crate::{globals::{WINDOW_SIZE, SPRITE_SIZE, MAP_SIZE}, ui::inspector::INSPECTOR_PANEL_SIZE};
 
 pub struct CameraPlugin;
 
@@ -69,16 +69,16 @@ fn move_camera(
     // NOTE: Restrict game to the map boundaries.
     let width = MAP_SIZE.0 as f32 * SPRITE_SIZE;
     let height = MAP_SIZE.1 as f32 * SPRITE_SIZE;
-
-    if transform.translation.x > width - WINDOW_SIZE.0 as f32 / 2.0 {
-        transform.translation.x = width - WINDOW_SIZE.0 as f32 / 2.0;
-    } else if transform.translation.x < WINDOW_SIZE.0 as f32 / 2.0 {
-        transform.translation.x = WINDOW_SIZE.0 as f32 / 2.0;
+    
+    if transform.translation.x > width - WINDOW_SIZE.0 as f32 / 2.0 + SPRITE_SIZE {
+        transform.translation.x = width - WINDOW_SIZE.0 as f32 / 2.0 + SPRITE_SIZE;
+    } else if transform.translation.x < WINDOW_SIZE.0 as f32 / 2.0 - (INSPECTOR_PANEL_SIZE + SPRITE_SIZE * 2.0){
+        transform.translation.x = WINDOW_SIZE.0 as f32 / 2.0 - (INSPECTOR_PANEL_SIZE + SPRITE_SIZE * 2.0);
     }
 
-    if transform.translation.y > height - WINDOW_SIZE.1 as f32 / 2.0 {
-        transform.translation.y = height - WINDOW_SIZE.1 as f32 / 2.0;
-    } else if transform.translation.y < WINDOW_SIZE.1 as f32 / 2.0 {
-        transform.translation.y = WINDOW_SIZE.1 as f32 / 2.0;
+    if transform.translation.y > height - WINDOW_SIZE.1 as f32 / 2.0 + SPRITE_SIZE {
+        transform.translation.y = height - WINDOW_SIZE.1 as f32 / 2.0 + SPRITE_SIZE;
+    } else if transform.translation.y < WINDOW_SIZE.1 as f32 / 2.0 - SPRITE_SIZE{
+        transform.translation.y = WINDOW_SIZE.1 as f32 / 2.0 - SPRITE_SIZE;
     }
 }
