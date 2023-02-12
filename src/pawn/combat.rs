@@ -5,6 +5,7 @@ use super::prelude::*;
 
 pub mod prelude {
     pub use super::{
+        HitDie,
         Health,
         DamageType,
         Resistance,
@@ -18,10 +19,6 @@ impl Plugin for CombatPlugin {
         app.add_system_to_stage(CoreStage::PreUpdate, setup_health);
     }
 }
-
-// NOTE: Base health for every creature for now
-// TODO: Change this later on.
-pub const BASE_HEALTH: u32 = 5;
 
 #[allow(dead_code)]
 // NOTE: All possible damage types, as a rule
@@ -46,10 +43,33 @@ pub struct Resistance {
     pub immunities: Vec<DamageType>,
 }
 
+#[allow(dead_code)]
+// NOTE: Die that is used to determine a pawn's health.
+pub enum HitDie {
+    D4,
+    D6,
+    D8,
+    D10,
+    D12,
+}
+
+impl HitDie {
+    pub fn value(&self) -> u32 {
+        match self {
+            HitDie::D4 => 4,
+            HitDie::D6 => 6,
+            HitDie::D8 => 8,
+            HitDie::D10 => 10,
+            HitDie::D12 => 12,
+        }
+    }
+}
+
 // NOTE: Contains the maximum and current health of the pawn,
 //       this component must be added after `PawnStats`.
 #[derive(Component)]
 pub struct Health {
+    pub hit_die: HitDie,
     pub current: i32,
     pub maximum: i32,
 }
@@ -65,10 +85,7 @@ fn setup_health(mut query: Query<(&mut Health, Option<&PawnStats>), (With<Pawn>,
             panic!();
         };
 
-        let test = crate::util::dice::roll(3, crate::util::dice::Die::D12(0), 3, crate::util::dice::Advantage::Normal);
-        println!("Dice Roll: {:?}", test);
-
-        health.maximum = BASE_HEALTH as i32 + get_stat_bonus(vitality);
+        health.maximum = health.hit_die.value() as i32 + get_stat_bonus(vitality);
         health.current = health.maximum;
     }
 }

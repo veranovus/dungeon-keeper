@@ -1,6 +1,7 @@
 mod name;
 pub mod turn;
 pub mod core;
+pub mod worker;
 pub mod combat;
 pub mod stats;
 

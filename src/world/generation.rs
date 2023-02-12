@@ -4,7 +4,8 @@ use pathfinding::prelude::*;
 
 use noise::{BasicMulti, NoiseFn, Perlin};
 
-use crate::{tileset, globals::{MAP_SIZE, SPRITE_SIZE, SPRITE_SCALE}};
+use super::tile::{prelude::*, self};
+use crate::{tileset, globals::MAP_SIZE};
 
 pub struct GenerationPlugin;
 
@@ -47,34 +48,25 @@ fn generate_world(
 
             let solid = noise.get(position) <= GENERATION_CAVE_TRESHOLD;
 
-            let color: Color;
-            let glyph: usize;
-
-            if solid {
-                // NOTE: Create tile as solid.
-                color = Color::rgb(0.46, 0.12, 0.12);
-                glyph = '#' as usize;
-
+            let material = ResourceMaterial::Dirt;
+            let state = if solid {
                 // NOTE: Push solid tile position to grid
                 world.push((x, y));
+
+                // NOTE: Create tile as solid.
+                TileState::Solid
             } else {
                 // NOTE: Create tile as empty.
-                color = Color::rgb(0.2, 0.2, 0.2);
-                glyph = '.' as usize;
-            }
+                TileState::Empty
+            };
 
             // Create tile entity
-            tileset::spawn_sprite_from_tileset(
-                &mut commands,
-                &tileset,
-                glyph,
-                Vec3::new(
-                    SPRITE_SIZE * x as f32, 
-                    SPRITE_SIZE * y as f32, 
-                    10.0
-                ),
-                Vec3::new(SPRITE_SCALE, SPRITE_SCALE, 1.0),
-                color,
+            tile::spawn_tile(
+                &mut commands, 
+                &tileset, 
+                (x, y), 
+                state, 
+                material,
             );
         }
     }

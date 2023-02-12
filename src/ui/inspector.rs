@@ -2,7 +2,6 @@ use bevy::prelude::*;
 use bevy_egui::{egui::{self, RichText, Color32}, EguiContext};
 
 use crate::{
-    player::component::prelude::*,
     pawn::prelude::*,
 };
 
@@ -16,7 +15,7 @@ impl Plugin for InspectorPlugin {
 
 fn pawn_inspector(
     mut egui_context: ResMut<EguiContext>,
-    query: Query<(&Selectable, &Name, &Health, Option<&Player>), With<Pawn>>
+    query: Query<(&Selectable, &Name, &Health, &Alignment), With<Pawn>>
 ) {
     egui::SidePanel::left("pawn_inspector")
         .min_width(200.0)
@@ -26,20 +25,23 @@ fn pawn_inspector(
             ui.heading("Inspector");
             ui.separator();
 
+            // NOTE: Prepare a list to sort by status of the `Player` component.
+            let mut sorted: Vec<(&Selectable, &Name, &Health, &Alignment)> = vec![];
+
             // NOTE: Display all the selected pawns.
-            for (selectable, name, health, player) in &query {
+            for tuple in &query {
+                sorted.push(tuple);
+            }
+
+            // NOTE: Sort and reverse the list
+            sorted.sort_by(|a, b| a.3.cmp(&b.3));
+            sorted.reverse();
+
+            for (selectable, name, health, alignment) in &sorted {
                 if selectable.selected {
                     ui.horizontal(|ui| {
-                        let color: Color32;
-                        let identifier;
-
-                        if player.is_some() {
-                            identifier = "P";
-                            color = Color32::from_rgb(25, 25, 255);
-                        } else {
-                            identifier = "E";
-                            color = Color32::from_rgb(255, 25, 25);
-                        }
+                        let color = alignment.color32();
+                        let identifier = alignment.identifier();
 
                         ui.label(RichText::new(identifier).color(color));
 
@@ -48,9 +50,12 @@ fn pawn_inspector(
                         ui.label(RichText::new(name.as_str()).strong());
                     });
 
-                    ui.label(
-                        format!("Health: {}/{}", health.maximum, health.current)
-                    );
+                    ui.horizontal(|ui| {
+                        ui.label("Health:");
+                        ui.label(RichText::new(
+                            format!("{} | {}", health.maximum, health.current
+                        )).color(Color32::GREEN));
+                    });
                 }
             }
         });

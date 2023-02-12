@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use core::fmt;
 use rand::Rng;
 use log::error;
 
@@ -54,6 +55,20 @@ impl Die {
             Die::D20(v) => v,
             Die::D100(v) => v,
         };
+    }
+}
+
+impl fmt::Display for Die {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Die::D4(_) => write!(f, "d4"),
+            Die::D6(_) => write!(f, "d6"),
+            Die::D8(_) => write!(f, "d8"),
+            Die::D10(_) => write!(f, "d10"),
+            Die::D12(_) => write!(f, "d12"),
+            Die::D20(_) => write!(f, "d20"),
+            Die::D100(_) => write!(f, "d100"),
+        }
     }
 }
 
@@ -119,5 +134,23 @@ pub fn roll(count: u32, die: Die, bonus: i32, advantage: Advantage) -> DiceRollR
                 results.1
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    #[ignore]
+    fn roll_dice() {
+        let count = 1;
+        let die = Die::D20(0);
+        let bonus = 5;
+        let advantage = Advantage::Normal;
+
+        let result = roll(count, die, bonus, advantage);
+
+        assert!((result.1 <= count as i32 * die.sides() as i32 + 5));
     }
 }

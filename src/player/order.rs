@@ -6,8 +6,6 @@ use log::info;
 
 use crate::{pawn::{prelude::*, core}, util::cursor, world};
 
-use super::component::*;
-
 pub struct OrderPlugin;
 
 #[allow(unused_variables)]
@@ -20,7 +18,7 @@ impl Plugin for OrderPlugin {
 // NOTE: Sets active task of the selected entities (with `Player` tag)
 //       to move action. This function clears the task queue.
 fn move_order(
-    mut query: Query<(&Selectable, &Position, &mut TaskQueue), (With<Player>, With<Pawn>)>,
+    mut query: Query<(&Selectable, &Position, &Alignment, &mut TaskQueue), With<Pawn>>,
     cursor_pos: Res<cursor::CursorPos>,
     buttons: Res<Input<MouseButton>>,
     world: Res<world::World>,
@@ -29,9 +27,16 @@ fn move_order(
         return;
     }
 
-    for (selectable, position, mut task_queue) in &mut query {
-        if selectable.selected {
+    for (selectable, position, alignment, mut task_queue) in &mut query {
+        let mut player_pawn = false;
+        if let Alignment::Player = alignment {
+            player_pawn = true;
+        }
+
+        if selectable.selected && player_pawn {
+            // NOTE: Clear the task queue and the active task.
             task_queue.queue.clear();
+            task_queue.active = Task::None;
 
             let target: Position = world::normalize_to_world_coordinates(cursor_pos.world).into();
 

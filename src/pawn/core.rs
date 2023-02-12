@@ -1,3 +1,4 @@
+use bevy_egui::egui::Color32;
 use rand::Rng;
 use std::collections::VecDeque;
 use bevy::prelude::*;
@@ -12,6 +13,7 @@ pub mod prelude {
         Pawn,
         Selectable,
         Position,
+        Alignment,
     };
 }
 
@@ -24,8 +26,8 @@ impl Plugin for CorePlugin {
     }
 }
 
-// NOTE: Highlight color for selected pawns.
-const PAWN_HIGHLIGHT_COLOR: Color = Color::WHITE;
+// NOTE: Highlight color used for selected pawns without `Alignment`.
+const DEFAULT_PAWN_HIGHLIGHT_COLOR: Color = Color::WHITE;
 
 // NOTE: Glyph that is used for default pawns.
 const DEFAULT_PAWN_GLYPH: usize = 2;
@@ -109,6 +111,49 @@ impl From<Position> for (usize, usize) {
     }
 }
 
+// NOTE: Alignment component, determines who owns a pawn.
+#[allow(dead_code)]
+#[derive(Component, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Alignment {
+    Neutral = -1,
+    Player = 1,
+    Enemy = 0,
+}
+
+impl Alignment {
+    pub fn identifier(&self) -> &'static str {
+        match self {
+            Alignment::Neutral => "N",
+            Alignment::Player => "P",
+            Alignment::Enemy => "E",
+        }
+    }
+
+    pub fn highlight(&self) -> Color {
+        match self {
+            Alignment::Neutral => Color::rgb(1.0, 0.5, 1.0),
+            Alignment::Player => Color::rgb(0.4, 0.4, 1.0),
+            Alignment::Enemy => Color::rgb(1.0, 0.4, 0.4),
+        }
+    }
+
+    pub fn color(&self) -> Color {
+        match self {
+            Alignment::Neutral => Color::rgb(0.8, 0.2, 0.8),
+            Alignment::Player => Color::rgb(0.1, 0.1, 0.7),
+            Alignment::Enemy => Color::rgb(0.7, 0.1, 0.1),
+        }
+    }
+
+    pub fn color32(&self) -> Color32 {
+        match self {
+            Alignment::Neutral => Color32::from_rgb(255, 120, 255),
+            Alignment::Player => Color32::from_rgb(25, 25, 255),
+            Alignment::Enemy => Color32::from_rgb(255, 25, 25),
+        }
+    }
+}
+
 // NOTE: Picks a random pawn name from pawn name table.
 pub fn pick_random_pawn_name() -> &'static str {
     let mut rng = rand::thread_rng();
@@ -163,12 +208,31 @@ pub fn spawn_default_pawn(
         .insert(Name::new(pick_random_pawn_name()))
         .insert(PawnStats::default())
         .insert(Health {
+            hit_die: HitDie::D6,
             current: 100,
             maximum: 100,
         });
 
     // NOTE: Insert entity into world.
     world.set_entity(position, Some(e));
+
+    return e;
+}
+
+// NOTE: Spawns a default entity with an alignment, this
+//       is the preffered way of spawning an entity.
+pub fn spawn_default_pawn_with_alignment(
+    commands: &mut Commands,
+    world: &mut world::World,
+    tileset: &tileset::Tileset,
+    position: (usize, usize),
+    alignment: Alignment,
+) -> Entity {
+    let e = spawn_default_pawn(
+        commands, world, tileset, position, alignment.color()
+    );
+
+    commands.entity(e).insert(alignment);
 
     return e;
 }
@@ -245,13 +309,27 @@ fn process_pawn_turns(
     }
 }
 
-// NOTE: Changes a pawns color to `PAWN_HIGHLIGHT_COLOR` if it is selected.
+// NOTE: Changes a pawn's color if it is selected, depending on
+//       their `Alignment`. If they don't have one, their color is
+//       set to `DEFAULT_PAWN_HIGHLIGHT_COLOR`. 
 fn highlight_selected_pawns(
-    mut query: Query<(&Selectable, &mut TextureAtlasSprite), (With<Pawn>, Changed<Selectable>)>,
+    mut query: Query<(
+        &Selectable, 
+        Option<&Alignment>, 
+        &mut TextureAtlasSprite
+    ), (
+        With<Pawn>, 
+        Changed<Selectable>
+    )>,
 ) {
-    for (selectable, mut sprite) in &mut query {
+    for (selectable, alignment, mut sprite) in &mut query {
+        let new_color = match alignment {
+            Some(a) => a.highlight(),
+            None => DEFAULT_PAWN_HIGHLIGHT_COLOR,
+        };
+
         if selectable.selected {
-            sprite.color = PAWN_HIGHLIGHT_COLOR;
+            sprite.color = new_color;
         } else {
             sprite.color = selectable.original_color;
         }
