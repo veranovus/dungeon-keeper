@@ -27,6 +27,9 @@ pub const GENERATION_CAVE_TRESHOLD: f64 = 0.12;
 // NOTE: Multiplier for the size of chunks that are going to turn into stone.
 pub const STONE_CHUNK_SIZE: f64 = 5.0;
 
+// NOTE: Offset that will be applied to the noise, when calculating tile hardness.
+pub const STONE_CHUNK_NOISE_OFFSET: (f64, f64) = (STONE_CHUNK_SIZE * 2.0, STONE_CHUNK_SIZE * 2.0);
+
 // NOTE: Required hardness treshold a tile has to
 //       be over in order to register as a stone.
 pub const MINIMUM_STONE_HARDNES: f64 = 0.12; 
@@ -299,8 +302,8 @@ fn generate_world(
             };
 
             let noise_pos: [f64; 2] = [
-                (x as f64) / MAP_SIZE.0 as f64 * STONE_CHUNK_SIZE,
-                (y as f64) / MAP_SIZE.1 as f64 * STONE_CHUNK_SIZE,
+                (x as f64) / MAP_SIZE.0 as f64 * STONE_CHUNK_SIZE + STONE_CHUNK_NOISE_OFFSET.0,
+                (y as f64) / MAP_SIZE.1 as f64 * STONE_CHUNK_SIZE + STONE_CHUNK_NOISE_OFFSET.1,
             ];
             let hardness: f64 = noise.get(noise_pos);
 

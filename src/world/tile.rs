@@ -1,7 +1,10 @@
 use bevy::prelude::*;
+use bevy_egui::egui::Color32;
 
 use crate::pawn::prelude::*;
 use crate::{tileset, globals};
+
+// TODO: Add necessary comments.
 
 pub mod prelude {
     pub use super::{
@@ -45,14 +48,36 @@ pub enum ResourceMaterial {
 }
 
 impl ResourceMaterial {
+    pub fn identifier(&self) -> &str {
+        match self {
+            ResourceMaterial::Dirt => "D",
+            ResourceMaterial::Stone => "S",
+            ResourceMaterial::Coal => "C",
+            ResourceMaterial::Iron => "I",
+            ResourceMaterial::Gold => "G",
+            ResourceMaterial::Crystal => "Cr",
+        }
+    }
+
     pub fn color(&self) -> Color {
         match self {
             ResourceMaterial::Dirt => Color::hex("4D312B").unwrap(),
             ResourceMaterial::Stone => Color::hex("4D4D4D").unwrap(),
             ResourceMaterial::Coal => Color::hex("242424").unwrap(),
-            ResourceMaterial::Iron => Color::hex("AAA8bA").unwrap(),
+            ResourceMaterial::Iron => Color::hex("AAA8BA").unwrap(),
             ResourceMaterial::Gold => Color::hex("FFD700").unwrap(),
             ResourceMaterial::Crystal => Color::hex("DE10DA").unwrap(),
+        }
+    }
+
+    pub fn color32(&self) -> Color32 {
+        match self {
+            ResourceMaterial::Dirt => Color32::from_rgb(77, 49, 43),
+            ResourceMaterial::Stone => Color32::from_rgb(77, 77, 77),
+            ResourceMaterial::Coal => Color32::from_rgb(56, 56, 56),
+            ResourceMaterial::Iron => Color32::from_rgb(170, 168, 186),
+            ResourceMaterial::Gold => Color32::from_rgb(255, 215, 0),
+            ResourceMaterial::Crystal => Color32::from_rgb(222, 16, 218), 
         }
     }
 

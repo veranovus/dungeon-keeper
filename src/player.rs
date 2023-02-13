@@ -1,4 +1,5 @@
 pub mod component;
+pub mod resource;
 mod selection;
 mod order;
 
@@ -12,6 +13,7 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(selection::SelectionPlugin)
             .add_plugin(order::OrderPlugin)
+            .add_plugin(resource::ResourcePlugin)
             .add_startup_system_to_stage(StartupStage::PostStartup, spawn_test_pawns);
     }
 }

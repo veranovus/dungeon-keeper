@@ -25,6 +25,13 @@ const SELECT_IMAGE_PATH: &str = "select.png";
 // NOTE: Color of the selection rectangle.
 const SELECT_COLOR: Color = Color::rgba(0.1, 1.0, 0.1, 0.05);
 
+#[allow(dead_code)]
+// NOTE: Possible selection types.
+pub enum SelectionType {
+    Entity,
+    Dig,
+}
+
 // NOTE: Event that is used to select entities
 //       with trait `Selectable` in given area.
 pub struct SelectEvent {
