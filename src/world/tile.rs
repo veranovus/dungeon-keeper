@@ -37,7 +37,7 @@ pub struct Tile {
 #[derive(Clone, Copy)]
 pub enum ResourceMaterial {
     Dirt,
-    Rock,
+    Stone,
     Coal,
     Iron,
     Gold,
@@ -48,8 +48,8 @@ impl ResourceMaterial {
     pub fn color(&self) -> Color {
         match self {
             ResourceMaterial::Dirt => Color::hex("4D312B").unwrap(),
-            ResourceMaterial::Rock => Color::hex("4D4D4D").unwrap(),
-            ResourceMaterial::Coal => Color::hex("141414").unwrap(),
+            ResourceMaterial::Stone => Color::hex("4D4D4D").unwrap(),
+            ResourceMaterial::Coal => Color::hex("242424").unwrap(),
             ResourceMaterial::Iron => Color::hex("AAA8bA").unwrap(),
             ResourceMaterial::Gold => Color::hex("FFD700").unwrap(),
             ResourceMaterial::Crystal => Color::hex("DE10DA").unwrap(),
@@ -59,7 +59,7 @@ impl ResourceMaterial {
     pub fn ratio(&self) -> f64 {
         match self {
             ResourceMaterial::Dirt => 0.00,
-            ResourceMaterial::Rock => 0.00,
+            ResourceMaterial::Stone => 0.00,
             ResourceMaterial::Coal => 0.90,
             ResourceMaterial::Iron => 0.80,
             ResourceMaterial::Gold => 0.60,
@@ -70,11 +70,22 @@ impl ResourceMaterial {
     pub fn ratio_reduction_rate(&self) -> f64 {
         match self {
             ResourceMaterial::Dirt => 0.00,
-            ResourceMaterial::Rock => 0.00,
+            ResourceMaterial::Stone => 0.00,
             ResourceMaterial::Coal => 0.10,
             ResourceMaterial::Iron => 0.15,
             ResourceMaterial::Gold => 0.20,
             ResourceMaterial::Crystal => 0.20,
+        }
+    }
+
+    pub fn range(&self) -> std::ops::Range<usize> {
+        match self {
+            ResourceMaterial::Dirt => 0..0,
+            ResourceMaterial::Stone => 0..0,
+            ResourceMaterial::Coal => 5..(8 + 1),
+            ResourceMaterial::Iron => 6..(8 + 1),
+            ResourceMaterial::Gold => 4..(6 + 1),
+            ResourceMaterial::Crystal => 3..(5 + 1),
         }
     }
 }

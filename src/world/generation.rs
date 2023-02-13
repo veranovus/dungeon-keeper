@@ -24,6 +24,13 @@ pub const GENERATION_CAVE_SIZE: f64 = 3.50;
 // NOTE: Threshold that decides which values are considered empty.
 pub const GENERATION_CAVE_TRESHOLD: f64 = 0.12;
 
+// NOTE: Multiplier for the size of chunks that are going to turn into stone.
+pub const STONE_CHUNK_SIZE: f64 = 5.0;
+
+// NOTE: Required hardness treshold a tile has to
+//       be over in order to register as a stone.
+pub const MINIMUM_STONE_HARDNES: f64 = 0.12; 
+
 // NOTE: Minimum distance that two seperate resources could be.
 pub const MINIMUM_RESOURCE_DISTANCE: f32 = 8.0;
 
@@ -32,6 +39,9 @@ pub const RESOURCE_DISTANCE_REDUCTION: f32 = 0.5;
 
 // NOTE: Maximum tries for a resource location
 pub const MAXIMUM_RESOURCE_ITERATION: usize = 15;
+
+// NOTE: Decides whether or not resources can spread to empty tile.
+pub const CAN_SPREAD_TO_FREE_TILE: bool = true;
 
 #[allow(dead_code)]
 // NOTE: Calculates the score for a given tile. This will be
@@ -128,7 +138,8 @@ fn pick_random_tile(
     }
 }
 
-// NOTE: Add note, maybe make it also spread to empty tiles?
+// NOTE: Speards resource to nearby tiles, creating more resources.
+//       Chance for a new resource to be created is reduced in every generation.
 fn spread_resource(
     commands: &mut Commands,
     rng: &mut StdRng,
@@ -164,7 +175,9 @@ fn spread_resource(
                 },
             );
 
-            if !spread || !grid.has_vertex(pos) || res.contains(&pos) {
+            let solid = grid.has_vertex(pos);
+
+            if !spread || (!CAN_SPREAD_TO_FREE_TILE && !solid) || res.contains(&pos) {
                 continue;
             }
 
@@ -174,7 +187,7 @@ fn spread_resource(
                 commands, 
                 tileset, 
                 pos, 
-                TileState::Solid, 
+                if solid { TileState::Solid } else { TileState::Empty }, 
                 material,
             );
 
@@ -228,16 +241,20 @@ fn generate_world(
     let grid = world.into_iter().collect::<Grid>();
 
     // NOTE: Setup resource count.
-    let resources: [(usize, ResourceMaterial); 2] = [
-        (rng.gen_range(6..10), ResourceMaterial::Iron),
-        (rng.gen_range(3..7), ResourceMaterial::Gold),
+    const RESOURCE_COUNT: usize = 4;
+
+    let resources: [(usize, ResourceMaterial); RESOURCE_COUNT] = [
+        (rng.gen_range(ResourceMaterial::Coal.range()), ResourceMaterial::Coal),
+        (rng.gen_range(ResourceMaterial::Iron.range()), ResourceMaterial::Iron),
+        (rng.gen_range(ResourceMaterial::Gold.range()), ResourceMaterial::Gold),
+        (rng.gen_range(ResourceMaterial::Crystal.range()), ResourceMaterial::Crystal),
     ];
 
     // NOTE: Vector to store exhausted resource positions.
     let mut exhausted: Vec<(usize, usize)> = vec![];
 
     // Generate resources.
-    for i in 0..2 {
+    for i in 0..RESOURCE_COUNT {
         let res = resources[i];
         for _ in 0..res.0 {
             let pos = pick_random_tile(&mut rng, &exhausted, &grid);
@@ -265,7 +282,8 @@ fn generate_world(
         }
     }
 
-    // Create non-resource tiles
+    // NOTE: Create non-resource tiles, they are either dirt
+    //       or stone depending on the hardness value of the tile.
     for y in 0..(MAP_SIZE.1) {
         for x in 0..(MAP_SIZE.0) {
             let pos = (x, y);
@@ -280,8 +298,14 @@ fn generate_world(
                 TileState::Empty
             };
 
-            let material = if rng.gen_bool(0.5) {
-                ResourceMaterial::Rock
+            let noise_pos: [f64; 2] = [
+                (x as f64) / MAP_SIZE.0 as f64 * STONE_CHUNK_SIZE,
+                (y as f64) / MAP_SIZE.1 as f64 * STONE_CHUNK_SIZE,
+            ];
+            let hardness: f64 = noise.get(noise_pos);
+
+            let material = if hardness > MINIMUM_STONE_HARDNES {
+                ResourceMaterial::Stone
             } else {
                 ResourceMaterial::Dirt
             };
