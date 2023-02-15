@@ -4,14 +4,59 @@ use bevy::prelude::*;
 
 use log::info;
 
-use crate::{pawn::{prelude::*, core}, util::cursor, world};
+use crate::{
+    pawn::{prelude::*, core}, 
+    util::cursor, world,
+    player::selection::prelude::*, globals,
+};
 
 pub struct OrderPlugin;
 
 #[allow(unused_variables)]
 impl Plugin for OrderPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_to_stage(CoreStage::PreUpdate, move_order);
+        app.add_system_to_stage(CoreStage::PreUpdate, select_pawns)
+            .add_system_to_stage(CoreStage::PreUpdate, move_order);
+    }
+}
+
+fn select_pawns(
+    mut query: Query<(&Transform, &mut Selectable), With<Pawn>>,
+    mut event_reader: EventReader<SelectionEvent>,
+) {
+    for e in event_reader.iter() {
+        let select = match e.selection_id {
+            SelectionID::Entity => true,
+            _ => false,
+        };
+
+        if select {
+            let (position, size) = match e.result {
+                SelectionResult::Default(position, size) => {
+                    (position, size)
+                },
+                _ => {
+                    continue;
+                }
+            };
+
+            for (transform, mut selectable) in &mut query {
+
+                // NOTE: Check if entity is in the square in both x and y coordinates.
+                let x = (transform.translation.x + globals::SPRITE_SIZE) > position.x
+                    && transform.translation.x < (position.x + size.x);
+                let y = (transform.translation.y + globals::SPRITE_SIZE) > position.y
+                    && transform.translation.y < (position.y + size.y);
+    
+                // NOTE: If it is simpy mark the entity as
+                //       selected and as not selected otherwise.
+                if x && y {
+                    selectable.selected = true;
+                } else {
+                    selectable.selected = false;
+                }
+            }
+        }
     }
 }
 

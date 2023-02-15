@@ -2,14 +2,12 @@
 
 A Tower Defense, Dungeon Management kind of game, but also inspired by Dwarf Fortress? Even I don't know where this game will go over time.
 
-> Version 0.1.6
+> Version 0.1.7
 
 ## Changelog
 
-- World generation improvement.
-- Player resources.
-- UI for player resources in the inspector.
-- Renamed `ui::inspector::pawn_inspector()` to `ui::inspector::inspector()`.
+- Completely new and more flexible selection system.
+- Moved `select_pawns()`, from `selection.rs` to `order.rs`.
 
 ## TODO
 
