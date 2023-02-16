@@ -152,6 +152,35 @@ fn setup_selection(
     commands.insert_resource(DEFAULT_SELECTION_STATE);
 }
 
+fn snap_selection(selection: &Selection) -> (Vec2, Vec2) {
+    let start = world::normalize_to_world_coordinates(
+        selection.start_pos
+    );
+
+    let mut r#final = world::normalize_to_world_coordinates(
+        selection.final_pos
+    );
+
+    if r#final.0 >= start.0 {
+        r#final.0 += 1;
+    }
+    if r#final.1 >= start.1 {
+        r#final.1 += 1;
+    }
+
+    let start = Vec2::new(
+        start.0 as f32 * globals::SPRITE_SIZE,
+        start.1 as f32 * globals::SPRITE_SIZE
+    );
+
+    let r#final = Vec2::new(
+        r#final.0 as f32 * globals::SPRITE_SIZE,
+        r#final.1 as f32 * globals::SPRITE_SIZE
+    );
+
+    return (start, r#final)
+}
+
 fn selection_prepare_event(
     mut query: Query<(&mut Selection, &mut Sprite)>,
     mut event_reader: EventReader<SelectionPrepareEvent>,
@@ -181,9 +210,9 @@ fn control_selection(
     buttons: Res<Input<MouseButton>>,
     keys: Res<Input<KeyCode>>,
 ) {
-    if cursor_pos.screen.x < inspector::INSPECTOR_PANEL_SIZE {
-        return;
-    } else if let SelectionState::Ignore = selection_state.get() {
+    let over_ui = cursor_pos.screen.x < inspector::INSPECTOR_PANEL_SIZE;
+
+    if let SelectionState::Ignore = selection_state.get() {
         return;
     }
 
@@ -198,60 +227,64 @@ fn control_selection(
         selection.selection_type = SelectionType::Possitive;
     }
 
-    if buttons.just_pressed(MouseButton::Left) {
-        selection.start_pos = cursor_pos.world;
-    }
-
-    if buttons.pressed(MouseButton::Left) {
-        let diff = (cursor_pos.world - selection.start_pos).length();
-
-        if (diff > DRAG_TRESHOLD) || selection.snap {
-            selection.drag = true;
+    if !over_ui {
+        if buttons.just_pressed(MouseButton::Left) {
+            selection.start_pos = cursor_pos.world;
+            selection.final_pos = cursor_pos.world;
+        }
+    
+        if buttons.pressed(MouseButton::Left) {
+            let diff = (cursor_pos.world - selection.start_pos).length();
+    
+            if (diff > DRAG_TRESHOLD) || selection.snap {
+                selection.drag = true;
+            }
         }
     }
 
-    if !buttons.pressed(MouseButton::Left) && selection.drag {
+    if buttons.just_released(MouseButton::Left) {
         selection.drag = false;
 
         if selection.snap {
+            let (s, f) = snap_selection(&selection);
 
-            let start = world::normalize_to_world_coordinates(
-                selection.start_pos
-            );
-
-            let mut r#final = world::normalize_to_world_coordinates(
-                selection.final_pos
-            );
-
-            if r#final.0 >= start.0 {
-                r#final.0 += 1;
-            }
-            if r#final.1 >= start.1 {
-                r#final.1 += 1;
-            }
-
-            // TODO: Add event writing...
-        } else {
-            let mut position = selection.start_pos;
-
-            let size = Vec2::new(
-                selection.final_pos.x - selection.start_pos.x,
-                selection.final_pos.y - selection.start_pos.y,
-            );
-
-            if selection.final_pos.x < selection.start_pos.x {
-                position.x += size.x;
-            }
-            if selection.final_pos.y < selection.start_pos.y {
-                position.y += size.y;
-            }
-
-            event_writer.send(SelectionEvent {
-                result: SelectionResult::Default(position, size.abs()),
-                selection_id: selection.selection_id,
-                selection_type: selection.selection_type,
-            });
+            selection.start_pos = s;
+            selection.final_pos = f;
         }
+
+        let mut position = selection.start_pos;
+
+        let size = Vec2::new(
+            selection.final_pos.x - selection.start_pos.x,
+            selection.final_pos.y - selection.start_pos.y,
+        );
+
+        if selection.final_pos.x < selection.start_pos.x {
+            position.x += size.x;
+        }
+        if selection.final_pos.y < selection.start_pos.y {
+            position.y += size.y;
+        }
+
+        let result = if selection.snap {
+            let position = world::normalize_to_world_coordinates(
+                position
+            );
+
+            let size = world::normalize_to_world_coordinates(
+                size.abs()
+            );
+
+            SelectionResult::Snap(position.into(), size.into())
+        } else {
+            SelectionResult::Default(position, size.abs())
+        };
+
+        event_writer.send(SelectionEvent {
+            result,
+            selection_id: selection.selection_id,
+            selection_type: selection.selection_type,
+        });
     }
 }
 
@@ -277,36 +310,15 @@ fn update_selection(
     visibility.is_visible = true;
 
     if selection.snap {
-        let start = world::normalize_to_world_coordinates(
-            selection.start_pos
-        );
+        let (start, r#final) = snap_selection(&selection);
 
-        let mut r#final = world::normalize_to_world_coordinates(
-            cursor_pos.world
-        );
-
-        if r#final.0 >= start.0 {
-            r#final.0 += 1;
-        }
-        if r#final.1 >= start.1 {
-            r#final.1 += 1;
-        }
-
-        let start = Vec2::new(
-            start.0 as f32 * globals::SPRITE_SIZE,
-            start.1 as f32 * globals::SPRITE_SIZE,
-        );
-
-        selection.final_pos = Vec2::new(
-            r#final.0 as f32 * globals::SPRITE_SIZE,
-            r#final.1 as f32 * globals::SPRITE_SIZE
-        );
+        selection.final_pos = cursor_pos.world;
 
         transform.translation.x = start.x;
         transform.translation.y = start.y;
 
-        transform.scale.x = selection.final_pos.x - start.x;
-        transform.scale.y = selection.final_pos.y - start.y;
+        transform.scale.x = r#final.x - start.x;
+        transform.scale.y = r#final.y - start.y;
     } else {
         selection.final_pos = cursor_pos.world;
 
