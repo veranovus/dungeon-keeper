@@ -20,6 +20,7 @@ impl Plugin for WorldPlugin {
 #[derive(Resource)]
 pub struct World {
     pub grid: Grid,
+    pub tiles: Vec<bool>,
     pub entities: Vec<Option<Entity>>,
 }
 
@@ -35,9 +36,19 @@ impl World {
         self.entities[(pos.1 * globals::MAP_SIZE.0 as usize) + pos.0] = value;
     }
 
-    // NOTE: Returns the state of a tile at given position
+    // NOTE: Returns the state of a tile at given position.
     pub fn is_solid_tile(&self, pos: (usize, usize)) -> bool {
         return self.grid.has_vertex(pos);
+    }
+
+    // NOTE: Returns the tile in the given position.
+    pub fn get_tile(&self, pos: (usize, usize)) -> bool {
+        return self.tiles[(pos.1 * globals::MAP_SIZE.0 as usize) + pos.0];
+    }
+
+    // NOTE: Sets the tile in the given position.
+    pub fn set_tile(&mut self, pos: (usize, usize), value: bool) {
+        return self.tiles[(pos.1 * globals::MAP_SIZE.0 as usize) + pos.0] = value;
     }
 }
 

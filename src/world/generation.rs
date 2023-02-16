@@ -326,6 +326,7 @@ fn generate_world(
     // NOTE: Setup world resource.
     commands.insert_resource(super::World {
         grid,
-        entities: vec![None; MAP_SIZE.0 * MAP_SIZE.1]
+        tiles: vec![false; MAP_SIZE.0 * MAP_SIZE.1],
+        entities: vec![None; MAP_SIZE.0 * MAP_SIZE.1],
     });
 }
