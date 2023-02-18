@@ -26,6 +26,15 @@ impl Plugin for OrderPlugin {
 #[derive(Component)]
 pub struct MineOrderIndicator;
 
+// NOTE: Color of the mine order indicator entities.
+const MINE_ORDER_INDICATOR_COLOR: Color = Color::rgba(1.0, 1.0, 0.1, 0.15);
+
+// NOTE: Glyph that will be used for mine order indicators.
+const MINE_ORDER_INDICATOR_GLYPH: usize = 11 * 16;
+
+// NOTE: Color for the selection that will be used for mine order.
+const MINE_ORDER_SELECTION_COLOR: Color = Color::rgba(1.0, 1.0, 0.1, 0.05);
+
 // NOTE: Depending on the player's input prepares the selection id, 
 //       and other properties of selection.
 fn prepare_selection(
@@ -35,7 +44,7 @@ fn prepare_selection(
     if keys.just_released(KeyCode::M) {
         event_writer.send(SelectionPrepareEvent {
             selection_id: SelectionID::Mine,
-            color: Color::rgba(1.0, 1.0, 0.1, 0.05),
+            color: MINE_ORDER_SELECTION_COLOR,
             snap: true,
         })
     }
@@ -187,14 +196,14 @@ fn mine_order(
                             let e = tileset::spawn_sprite_from_tileset(
                                 &mut commands,
                                 &tileset,
-                                11 * 16,
+                                MINE_ORDER_INDICATOR_GLYPH,
                                 Vec3::new(
                                     position.0 as f32 * globals::SPRITE_SIZE,
                                     position.1 as f32 * globals::SPRITE_SIZE,
                                     globals::SPRITE_ORDER_USER,
                                 ),
                                 Vec3::new(globals::SPRITE_SCALE, globals::SPRITE_SCALE, 1.0),
-                                Color::rgba(1.0, 1.0, 0.1, 0.2),
+                                MINE_ORDER_INDICATOR_COLOR,
                             );
     
                             commands.entity(e)
