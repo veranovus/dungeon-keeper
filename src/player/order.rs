@@ -32,8 +32,11 @@ const MINE_ORDER_INDICATOR_COLOR: Color = Color::rgba(1.0, 1.0, 0.1, 0.15);
 // NOTE: Glyph that will be used for mine order indicators.
 const MINE_ORDER_INDICATOR_GLYPH: usize = 11 * 16;
 
-// NOTE: Color for the selection that will be used for mine order.
-const MINE_ORDER_SELECTION_COLOR: Color = Color::rgba(1.0, 1.0, 0.1, 0.05);
+// NOTE: Colors for the selection that will be used for mine order.
+const MINE_ORDER_SELECTION_COLORS: [Color; 2] = [
+    Color::rgba(1.0, 1.0, 0.1, 0.05),
+    Color::rgba(1.0, 0.1, 0.1, 0.05),
+];
 
 // NOTE: Depending on the player's input prepares the selection id, 
 //       and other properties of selection.
@@ -44,7 +47,7 @@ fn prepare_selection(
     if keys.just_released(KeyCode::M) {
         event_writer.send(SelectionPrepareEvent {
             selection_id: SelectionID::Mine,
-            color: MINE_ORDER_SELECTION_COLOR,
+            colors: MINE_ORDER_SELECTION_COLORS,
             snap: true,
         })
     }

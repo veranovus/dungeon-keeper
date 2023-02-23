@@ -98,7 +98,7 @@ struct Selection {
     started: bool,
     drag: bool,
     snap: bool,
-    color: Color,
+    colors: [Color; 2],
     selection_id: SelectionID,
     selection_type: SelectionType,
     start_pos: Vec2,
@@ -111,7 +111,10 @@ impl Default for Selection {
             started: false,
             drag: false,
             snap: false,
-            color: DEFAULT_SELECTION_COLOR,
+            colors: [
+                DEFAULT_SELECTION_COLOR,
+                DEFAULT_SELECTION_COLOR
+            ],
             selection_id: DEFAULT_SELECTION_ID,
             selection_type: SelectionType::Possitive,
             start_pos: Vec2::ZERO,
@@ -144,7 +147,7 @@ pub struct SelectionEvent {
 // NOTE: Event that is used to change the properties of the selection.
 pub struct SelectionPrepareEvent {
     pub selection_id: SelectionID,
-    pub color: Color,
+    pub colors: [Color; 2],
     pub snap: bool,
 }
 
@@ -153,7 +156,10 @@ impl Default for SelectionPrepareEvent {
     fn default() -> Self {
         Self {
             selection_id: DEFAULT_SELECTION_ID,
-            color: DEFAULT_SELECTION_COLOR,
+            colors: [
+                DEFAULT_SELECTION_COLOR,
+                DEFAULT_SELECTION_COLOR
+            ],
             snap: false,
         }
     }
@@ -242,17 +248,16 @@ fn selection_prepare_event(
         selection.reset();
 
         selection.selection_id = e.selection_id;
-        selection.color = e.color;
+        selection.colors = e.colors;
         selection.snap = e.snap;
 
-        // TODO: Apply color change to sprite.
-        sprite.color = selection.color;
+        // NOTE: Apply color change to sprite.
+        sprite.color = selection.colors[0];
     }
 }
 
-// FIXME: Make it so a selection can't possibly start over ui.
 fn control_selection(
-    mut selection: Query<&mut Selection>,
+    mut selection: Query<(&mut Selection, &mut Sprite)>,
     mut event_writer: EventWriter<SelectionEvent>,
     selection_state: Res<SelectionState>,
     cursor_pos: Res<cursor::CursorPos>,
@@ -266,7 +271,7 @@ fn control_selection(
         return;
     }
 
-    let mut selection = if let Ok(s) = selection.get_single_mut() { s } else {
+    let (mut selection, mut sprite) = if let Ok(s) = selection.get_single_mut() { s } else {
         error!("More than one entity has the trait `Selection`.");
         panic!();
     };
@@ -274,8 +279,10 @@ fn control_selection(
     // NOTE: Set the selection type.
     if keys.pressed(KeyCode::LShift) {
         selection.selection_type = SelectionType::Negative;
+        sprite.color = selection.colors[1];
     } else {
         selection.selection_type = SelectionType::Possitive;
+        sprite.color = selection.colors[0];
     }
 
 
