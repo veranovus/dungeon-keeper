@@ -2,11 +2,12 @@
 
 A Tower Defense, Dungeon Management kind of game, but also inspired by Dwarf Fortress? Even I don't know where this game will go over time.
 
-> Version 0.2.0.1
+> Version 0.2.0.2
 
 ## Changelog
 
-- Different colors of positive and negative selections, this feature is optional.
+- World now has a copy of each tile's data in a tile grid.
+- Implemented the global work pool.
 
 ## TODO
 

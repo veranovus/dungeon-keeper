@@ -28,6 +28,7 @@ pub enum Task {
     None,
     Move(MoveTask),
     Attack(Entity),
+    Mine(Position),
 }
 
 // NOTE: A component that holds the tasks
@@ -109,7 +110,8 @@ pub fn pawn_act_turn(
                 None => {}
             };
         }
-        Task::Attack(_) => {}
+        Task::Attack(_) => {},
+        Task::Mine(_target) => {},
     }
 
     task_queue.next_tast();

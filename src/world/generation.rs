@@ -5,7 +5,7 @@ use noise::{BasicMulti, NoiseFn, Perlin};
 use rand::{Rng, rngs::StdRng, SeedableRng};
 
 use super::tile::prelude::*;
-use crate::{tileset, globals::MAP_SIZE};
+use crate::{tileset, globals::MAP_SIZE, world::tile::TileData};
 
 pub struct GenerationPlugin;
 
@@ -145,6 +145,7 @@ fn pick_random_tile(
 //       Chance for a new resource to be created is reduced in every generation.
 fn spread_resource(
     commands: &mut Commands,
+    tile_grid: &mut Vec<TileData>,
     rng: &mut StdRng,
     res: &mut Vec<(usize, usize)>,
     tileset: &tileset::Tileset,
@@ -188,6 +189,7 @@ fn spread_resource(
 
             super::tile::spawn_tile(
                 commands, 
+                tile_grid,
                 tileset, 
                 pos, 
                 if solid { TileState::Solid } else { TileState::Empty }, 
@@ -196,6 +198,7 @@ fn spread_resource(
 
             spread_resource(
                 commands, 
+                tile_grid,
                 rng, 
                 res, 
                 tileset, 
@@ -240,6 +243,9 @@ fn generate_world(
         }
     }
 
+    // NOTE: Create the tile grid.
+    let mut tile_grid = vec![TileData::default(); MAP_SIZE.0 * MAP_SIZE.1];
+
     // NOTE: Create the world grid.
     let grid = world.into_iter().collect::<Grid>();
 
@@ -266,6 +272,7 @@ fn generate_world(
 
             super::tile::spawn_tile(
                 &mut commands, 
+                &mut tile_grid,
                 &tileset, 
                 pos, 
                 TileState::Solid, 
@@ -274,6 +281,7 @@ fn generate_world(
 
             spread_resource(
                 &mut commands, 
+                &mut tile_grid,
                 &mut rng, 
                 &mut exhausted, 
                 &tileset, 
@@ -315,6 +323,7 @@ fn generate_world(
 
             super::tile::spawn_tile(
                 &mut commands, 
+                &mut tile_grid,
                 &tileset, 
                 pos, 
                 state, 
@@ -326,7 +335,7 @@ fn generate_world(
     // NOTE: Setup world resource.
     commands.insert_resource(super::World {
         grid,
-        tiles: vec![false; MAP_SIZE.0 * MAP_SIZE.1],
+        tiles: tile_grid,
         entities: vec![None; MAP_SIZE.0 * MAP_SIZE.1],
     });
 }

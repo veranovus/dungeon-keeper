@@ -20,7 +20,7 @@ impl Plugin for WorldPlugin {
 #[derive(Resource)]
 pub struct World {
     pub grid: Grid,
-    pub tiles: Vec<bool>,
+    pub tiles: Vec<tile::TileData>,
     pub entities: Vec<Option<Entity>>,
 }
 
@@ -42,13 +42,13 @@ impl World {
     }
 
     // NOTE: Returns the tile in the given position.
-    pub fn get_tile(&self, pos: (usize, usize)) -> bool {
+    pub fn get_tile(&self, pos: (usize, usize)) -> tile::TileData {
         return self.tiles[(pos.1 * globals::MAP_SIZE.0 as usize) + pos.0];
     }
 
     // NOTE: Sets the tile in the given position.
-    pub fn set_tile(&mut self, pos: (usize, usize), value: bool) {
-        return self.tiles[(pos.1 * globals::MAP_SIZE.0 as usize) + pos.0] = value;
+    pub fn get_tile_mut(&mut self, pos: (usize, usize)) -> &mut tile::TileData {
+        return &mut self.tiles[(pos.1 * globals::MAP_SIZE.0 as usize) + pos.0];
     }
 }
 

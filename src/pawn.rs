@@ -20,6 +20,7 @@ pub struct PawnPlugin;
 impl Plugin for PawnPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(core::CorePlugin)
+            .add_plugin(worker::WorkerPlugin)
             .add_plugin(combat::CombatPlugin);
     }
 }

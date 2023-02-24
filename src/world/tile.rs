@@ -16,7 +16,7 @@ pub mod prelude {
 }
 
 #[allow(dead_code)]
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum TileState {
     Empty,
     Solid,
@@ -37,7 +37,7 @@ pub struct Tile {
 }
 
 #[allow(dead_code)]
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum ResourceMaterial {
     Dirt,
     Stone,
@@ -115,19 +115,41 @@ impl ResourceMaterial {
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Debug, Clone, Copy)]
 pub struct Resource {
     pub material: ResourceMaterial,
     pub quantity: usize,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct TileData {
+    pub state: TileState,
+    pub resource: Resource,
+    pub marked: bool,
+}
+
+impl Default for TileData {
+    fn default() -> Self {
+        Self {
+            state: TileState::Empty,
+            resource: Resource {
+                material: ResourceMaterial::Dirt,
+                quantity: 0,
+            },
+            marked: false,
+        }
+    }
+}
+
 pub fn spawn_tile(
     commands: &mut Commands,
+    tile_grid: &mut Vec<TileData>,
     tileset: &tileset::Tileset,
     position: (usize, usize),
     state: TileState,
     material: ResourceMaterial,
 ) -> Entity {
+    // NOTE: Spwan and initialize the tile entity
     let e = tileset::spawn_sprite_from_tileset(
         commands, 
         tileset, 
@@ -150,6 +172,20 @@ pub fn spawn_tile(
             material,
             quantity: 0,
         });
+
+    // NOTE: Set the tile in the tile grid.
+    let tile = tile_grid.get_mut(
+        (position.1 * globals::MAP_SIZE.0) + position.0
+    ).unwrap();
+
+    *tile = TileData {
+        state,
+        resource: Resource {
+            material,
+            quantity: 1,
+        },
+        marked: false,
+    };
     
     return e;
 }

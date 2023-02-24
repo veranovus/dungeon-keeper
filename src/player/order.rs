@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use log::info;
 
 use crate::{
-    pawn::{prelude::*, core}, 
+    pawn::{prelude::*, core, worker}, 
     util::cursor, world,
     player::selection::prelude::*, globals, tileset,
 };
@@ -153,6 +153,7 @@ fn mine_order(
     mut commands: Commands,
     mut world: ResMut<world::World>,
     mut event_reader: EventReader<SelectionEvent>,
+    mut global_work_pool: ResMut<worker::GlobalWorkPool>,
     query: Query<(Entity, &Position), With<MineOrderIndicator>>,
     tileset: Res<tileset::Tileset>,
 ) {
@@ -194,7 +195,7 @@ fn mine_order(
             match e.selection_type {
                 SelectionType::Possitive => {
                     for position in &positions {
-                        if world.is_solid_tile(*position) && !world.get_tile(*position){
+                        if world.is_solid_tile(*position) && !world.get_tile(*position).marked{
                             // NOTE: Setup the mine-task shadow entity..
                             let e = tileset::spawn_sprite_from_tileset(
                                 &mut commands,
@@ -213,8 +214,15 @@ fn mine_order(
                                 .insert(Position::from(*position))
                                 .insert(MineOrderIndicator);
     
-                            // NOTE: Change the tile properties in the world.
-                            world.set_tile(*position, true);
+                            // NOTE: Change the tile's marked flag to true.
+                            let mut tile = world.get_tile_mut(*position);
+
+                            tile.marked = true;
+
+                            // NOTE: Push the work to the global work pool
+                            global_work_pool.works.push(
+                                (Task::Mine((*position).into()), false)
+                            );
                         }
                     }
                 },
@@ -229,8 +237,30 @@ fn mine_order(
                                 // NOTE: Despawn the entity.
                                 commands.entity(entity).despawn_recursive();
 
-                                // NOTE: Change the tile properties in the world.
-                                world.set_tile(*position, false);
+                                // NOTE: Change the tile's marked flag to false.    
+                                let mut tile = world.get_tile_mut(*position);
+                            
+                                tile.marked = false;
+
+                                // NOTE: Remove the work from the global work queue.
+                                // TODO: Add a system to notify pawns when a work is removed from the pool.
+                                let mut remove = vec![];
+
+                                for (i, (task, _owned)) in global_work_pool.works.iter().enumerate() {
+                                    if let Task::Mine(target) = task {
+                                        if (target.x as usize == position.0) && 
+                                           (target.y as usize == position.1) {
+                                            
+                                            if !remove.contains(&i) {
+                                                remove.push(i);
+                                            }
+                                        }
+                                    }
+                                }
+
+                                for i in remove {
+                                    global_work_pool.works.remove(i);
+                                }
 
                                 break;
                             }
