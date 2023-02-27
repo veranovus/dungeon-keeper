@@ -1,9 +1,9 @@
 use bevy::prelude::*;
 use std::collections::VecDeque;
-use log::info;
+use log::{info, error};
 
 use crate::world;
-use super::core::{prelude::*, self};
+use super::{core::{prelude::*, self}, worker};
 
 pub mod prelude {
     pub use super::{
@@ -28,7 +28,7 @@ pub enum Task {
     None,
     Move(MoveTask),
     Attack(Entity),
-    Mine(Position),
+    Mine((Position, uuid::Uuid)),
 }
 
 // NOTE: A component that holds the tasks
@@ -58,6 +58,8 @@ pub fn pawn_act_turn(
     transform: &mut Transform,
     position: &mut Position,
     world: &mut world::World,
+    global_work_pool: &mut worker::GlobalWorkPool,
+    mine_tile_er: &mut EventWriter<worker::MineTileEvent>,
 ) {
     match &mut task_queue.active {
         Task::None => {}
@@ -111,7 +113,40 @@ pub fn pawn_act_turn(
             };
         }
         Task::Attack(_) => {},
-        Task::Mine(_target) => {},
+        Task::Mine((target, id)) => {
+            // NOTE: Get the current work from the pool
+            let result = global_work_pool.get_work_mut(id);
+
+            match result {
+                Some(work) => {
+                    // NOTE: Calculate the distance to the target tile.
+                    let dist = Vec2::new(
+                        (target.x - position.x).abs() as f32,
+                        (target.y - position.y).abs() as f32,
+                    ).length();
+
+                    // NOTE: If the pawn failed to reach to the target tile
+                    //       for some reason, set work to unoccupied again.
+                    if dist > f32::sqrt(2.0) {
+                        work.occupied = false;
+                    } else {
+                        // NOTE: Otherwise remove the work from the `GlobalWorkPool`.
+                        let result = global_work_pool.remove_work(id);
+
+                        if !result {
+                            error!("Failed to remove work from the `GlobalWorkPool`, this should have never happened.");
+                            panic!();
+                        }
+
+                        // NOTE: Send a `MineTileEvent` with given target position.
+                        mine_tile_er.send(worker::MineTileEvent(*target));
+                    }
+                },
+                None => {
+                    info!("Failed to get work from the `GlobalWorkPool`, mine task is skipped.");
+                }
+            }
+        },
     }
 
     task_queue.next_tast();

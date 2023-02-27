@@ -6,7 +6,7 @@ use pathfinding::prelude::*;
 
 use crate::{world, tileset, globals, turn_system};
 
-use super::{prelude::*, turn, name};
+use super::{prelude::*, turn, name, worker};
 
 pub mod prelude {
     pub use super::{
@@ -29,8 +29,8 @@ impl Plugin for CorePlugin {
 // NOTE: Highlight color used for selected pawns without `Alignment`.
 const DEFAULT_PAWN_HIGHLIGHT_COLOR: Color = Color::WHITE;
 
-// NOTE: Glyph that is used for default pawns.
-const DEFAULT_PAWN_GLYPH: usize = 2;
+// NOTE: Default glyph for any pawn.
+pub const DEFAULT_PAWN_GLYPH: usize = 2;
 
 // NOTE: A tag that is required for every pawn to have.
 #[derive(Component)]
@@ -176,6 +176,7 @@ pub fn spawn_default_pawn(
     commands: &mut Commands,
     world: &mut world::World,
     tileset: &tileset::Tileset,
+    glyph: usize,
     position: (usize, usize),
     color: Color,
 ) -> Entity {
@@ -183,7 +184,7 @@ pub fn spawn_default_pawn(
     let e = tileset::spawn_sprite_from_tileset(
         commands,
         tileset,
-        DEFAULT_PAWN_GLYPH,
+        glyph,
         Vec3::new(
             position.0 as f32 * globals::SPRITE_SIZE,
             position.1 as f32 * globals::SPRITE_SIZE,
@@ -225,11 +226,12 @@ pub fn spawn_default_pawn_with_alignment(
     commands: &mut Commands,
     world: &mut world::World,
     tileset: &tileset::Tileset,
+    glyph: usize,
     position: (usize, usize),
     alignment: Alignment,
 ) -> Entity {
     let e = spawn_default_pawn(
-        commands, world, tileset, position, alignment.color()
+        commands, world, tileset, glyph, position, alignment.color()
     );
 
     commands.entity(e).insert(alignment);
@@ -285,7 +287,9 @@ pub fn pawn_find_path(
 fn process_pawn_turns(
     mut query: Query<(Entity, &mut TaskQueue, &mut Transform, &mut Position), With<Pawn>>,
     mut world: ResMut<world::World>,
+    mut global_work_pool: ResMut<worker::GlobalWorkPool>,
     mut event_reader: EventReader<turn_system::TurnOverEvent>,
+    mut mine_tile_ew: EventWriter<worker::MineTileEvent>,
 ) {
     let mut over = false;
     for _ in event_reader.iter() {
@@ -305,6 +309,8 @@ fn process_pawn_turns(
             &mut transform,
             &mut position,
             &mut world,
+            &mut global_work_pool,
+            &mut mine_tile_ew,
         );
     }
 }

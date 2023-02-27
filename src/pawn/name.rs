@@ -1,7 +1,6 @@
 // NOTE: List of pre-selected names for pawns.
 //       - Odds  -> Female Names
 //       - Evens -> Male Names
-// TODO: Add different names for differnet pawn archetypes.
 pub const PAWN_NAMES: &'static [&'static str] = &[
     "Hurmugith Stronghide", "Ermmus Xuam",
     "Vatraethra Platefeet", "Gadaec Trolltank",

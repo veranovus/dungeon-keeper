@@ -220,8 +220,13 @@ fn mine_order(
                             tile.marked = true;
 
                             // NOTE: Push the work to the global work pool
+                            let id = uuid::Uuid::new_v4();
+
                             global_work_pool.works.push(
-                                (Task::Mine((*position).into()), false)
+                                worker::GlobalWork::new(
+                                    Task::Mine(((*position).into(), id)),
+                                    id,
+                                )
                             );
                         }
                     }
@@ -243,11 +248,10 @@ fn mine_order(
                                 tile.marked = false;
 
                                 // NOTE: Remove the work from the global work queue.
-                                // TODO: Add a system to notify pawns when a work is removed from the pool.
                                 let mut remove = vec![];
 
-                                for (i, (task, _owned)) in global_work_pool.works.iter().enumerate() {
-                                    if let Task::Mine(target) = task {
+                                for (i, work) in global_work_pool.works.iter().enumerate() {
+                                    if let Task::Mine((target, _)) = work.task {
                                         if (target.x as usize == position.0) && 
                                            (target.y as usize == position.1) {
                                             

@@ -6,6 +6,14 @@ use crate::{tileset, globals};
 
 // TODO: Add necessary comments.
 
+pub struct TilePlugin;
+
+impl Plugin for TilePlugin {
+    fn build(&self, app: &mut App) {
+        app.add_system_to_stage(CoreStage::PreUpdate, update_tile_visuals);
+    }
+}
+
 pub mod prelude {
     pub use super::{
         TileState,
@@ -188,4 +196,22 @@ pub fn spawn_tile(
     };
     
     return e;
+}
+
+fn update_tile_visuals(
+    mut query: Query<
+        (&Tile, &Resource, &mut TextureAtlasSprite), 
+        Or<(Changed<Tile>, Changed<Resource>)>,
+    >,
+) {
+    for (tile, res, mut sprite) in &mut query {
+        // NOTE: Change the glyph according to the `TileState`.
+        *sprite = TextureAtlasSprite::new(tile.state.glyph());
+
+        // NOTE: Change the color according to the `ResourceMaterial`.
+        sprite.color = res.material.color();
+
+        // NOTE: Set the anchor to defualt
+        sprite.anchor = globals::DEFAULT_SPRITE_ANCHOR;
+    }
 }

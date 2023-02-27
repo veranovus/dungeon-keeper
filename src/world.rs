@@ -11,7 +11,8 @@ pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(generation::GenerationPlugin);
+        app.add_plugin(generation::GenerationPlugin)
+            .add_plugin(tile::TilePlugin);
     }
 }
 
