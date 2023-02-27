@@ -5,7 +5,7 @@ use bevy::prelude::*;
 
 use crate::{
     world::{self, tile}, 
-    tileset, player::order
+    tileset, player::{resource, order}
 };
 use super::{
     turn::prelude::*,
@@ -297,6 +297,7 @@ fn mine_tile_event(
     mut world: ResMut<world::World>,
     mut event_reader: EventReader<MineTileEvent>,
     mut tiles: Query<(&Position, &tile::Resource, &mut tile::Tile)>,
+    mut player_resources: ResMut<resource::PlayerResources>,
     indicators: Query<(Entity, &Position), With<order::MineOrderIndicator>>,
 ) {
     for e in event_reader.iter() {
@@ -318,6 +319,12 @@ fn mine_tile_event(
                 continue;
             }
 
+            // NOTE: Increase the player's resource count for that material
+            let mut res =  &mut player_resources.resources[res.material as usize];
+
+            res.quantity += 1;
+
+            // NOTE: Change `TileState` to empty.
             tile.state = tile::TileState::Empty;
             break;
         }

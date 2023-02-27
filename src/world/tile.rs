@@ -47,7 +47,7 @@ pub struct Tile {
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 pub enum ResourceMaterial {
-    Dirt,
+    Dirt = 0,
     Stone,
     Coal,
     Iron,

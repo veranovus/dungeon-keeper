@@ -2,7 +2,7 @@
 
 A Tower Defense, Dungeon Management kind of game, but also inspired by Dwarf Fortress? Even I don't know where this game will go over time.
 
-> Version 0.2.0.3
+> Version 0.2.0.4
 
 ## Changelog
 
@@ -13,7 +13,8 @@ A Tower Defense, Dungeon Management kind of game, but also inspired by Dwarf For
 - Workers are able to find the nearest available work.
 - Workers are able to mine tiles.
 - Tile entities changes visually depending on their Tile and Resource components.
+- Player resources increase when a tile is mined.
 
 ## TO-DO
 
-- Increase player's resources depending on the tile that is mined.
+- Fix the bug which occurs when player orders a worker to move mid work.
