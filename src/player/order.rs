@@ -119,8 +119,7 @@ fn move_order(
         }
 
         if selectable.selected && player_pawn {
-            // NOTE: Clear the task queue and the active task.
-            task_queue.queue.clear();
+            // NOTE: Clear the active task.
             task_queue.active = Task::None;
 
             let target: Position = world::normalize_to_world_coordinates(cursor_pos.world).into();
@@ -136,9 +135,9 @@ fn move_order(
                     //       pawn is already on that tile.
                     path.remove(0);
 
-                    // NOTE: Convert path into a VecDeque from
-                    //       Vec, and push the task to the pawn.
-                    task_queue.queue.push_back(Task::Move(MoveTask {
+                    // NOTE: Convert path into a VecDeque from Vec, and
+                    //       push the task to the queue as the first task.
+                    task_queue.queue.push_front(Task::Move(MoveTask {
                         path: VecDeque::from(path),
                         target,
                     }));
