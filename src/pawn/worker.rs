@@ -5,7 +5,8 @@ use bevy::prelude::*;
 
 use crate::{
     world::{self, tile}, 
-    tileset, player::{resource, order}
+    tileset, 
+    player::{resource, order},
 };
 use super::{
     turn::prelude::*,
@@ -300,56 +301,66 @@ fn mine_tile_event(
     mut player_resources: ResMut<resource::PlayerResources>,
     indicators: Query<(Entity, &Position), With<order::MineOrderIndicator>>,
 ) {
+    // NOTE: If there is no event present return.
+    if event_reader.is_empty() {
+        return;
+    }
+
+    let mut targets = vec![];
+
     for e in event_reader.iter() {
-        // NOTE: Get the target position
         let target = e.0;
+
+        // NOTE: Push position to vector
+        targets.push(target);
 
         // NOTE: Change the world data for the target tile
         let tile = world.get_tile_mut(target.into());
         
         tile.state = tile::TileState::Empty;
 
+        // NOTE: Increase the player's resource count acording to the tile's material
+        let mut res =  &mut player_resources.resources[tile.resource.material as usize];
+
+        res.quantity += 1;
+
         // NOTE: Change the grid data for the target tile
         world.grid.remove_vertex(target.into());
+    }
 
-        // NOTE: Loop trough every tile in the array, and
-        //       set the matching tile's state to empty.
-        for (position, res, mut tile) in &mut tiles {
-            if position.x != target.x || position.y != target.y {
-                continue;
+    // NOTE: Despawn the indicator entities with target positions.
+    let mut marked = vec![];
+
+    for (entity, position) in &indicators {
+        if !targets.contains(position) {
+            continue;
+        }
+
+        marked.push(entity);
+    }
+
+    for e in marked {
+        commands.entity(e).despawn();
+    }
+
+    // NOTE: Change tiles in the position array.
+    for (position, res, mut tile) in &mut tiles {
+        let mut index = -1;
+        for (i, target) in targets.iter().enumerate() {
+            if position == target {
+                index = i as i32;
+                break;
             }
-
-            // NOTE: Increase the player's resource count for that material
-            let mut res =  &mut player_resources.resources[res.material as usize];
-
-            res.quantity += 1;
-
-            // NOTE: Change `TileState` to empty.
-            tile.state = tile::TileState::Empty;
-            break;
         }
 
-        // NOTE: Loop trough every mine indicator, and
-        //       despawn the indicater at target position.
-        let mut marked: Option<Entity> = None;
-
-        for (entity, position) in &indicators {
-            if position.x != target.x || position.y != target.y {
-                continue;
-            }
-
-            marked = Some(entity);
-            break;
+        if index == -1 {
+            continue;
         }
 
-        if let Some(entity) = marked {
-            commands.entity(entity).despawn();
-        } else {
-            error!(
-                "Failed to locate mine indicator for the given `MineTileEvent` at position, `{:?}`.", 
-                target
-            );
-            panic!();
-        }
+        // NOTE: Remove target position from the vector
+        targets.remove(index as usize);
+
+        // NOTE: Change `TileState` to empty.
+        tile.state = tile::TileState::Empty;
     }
 }
