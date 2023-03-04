@@ -28,7 +28,7 @@ pub enum Task {
     None,
     Move(MoveTask),
     Attack(Entity),
-    Mine((Position, uuid::Uuid)),
+    Mine((Position, worker::GlobalWorkID)),
 }
 
 #[allow(dead_code)]
@@ -158,8 +158,6 @@ pub fn pawn_act_turn(
                     info!("Failed to get work from the `GlobalWorkPool`, mine task is skipped.");
                 }
             }
-            
-            println!("WORK-ID: {}", id);
         },
     }
 

@@ -152,7 +152,8 @@ fn mine_order(
     mut commands: Commands,
     mut world: ResMut<world::World>,
     mut event_reader: EventReader<SelectionEvent>,
-    mut event_writer: EventWriter<worker::RegisterGlobalWorkEvent>,
+    mut remove_work_ew: EventWriter<worker::RemoveGlobalWorkEvent>,
+    mut register_work_ew: EventWriter<worker::RegisterGlobalWorkEvent>,
     query: Query<(Entity, &Position), With<MineOrderIndicator>>,
     tileset: Res<tileset::Tileset>,
 ) {
@@ -193,7 +194,6 @@ fn mine_order(
             //       delete or create new indicators.
             match e.selection_type {
                 SelectionType::Possitive => {
-                    let mut counter = 0;
                     for position in &positions {
                         if world.is_solid_tile(*position) && !world.get_tile(*position).marked{
                             // NOTE: Setup the mine-task shadow entity..
@@ -221,22 +221,19 @@ fn mine_order(
 
                             // NOTE: Send the `RegisterGlobalWorkEvent`.
                             let position: Position = (*position).into();
-                            let id = uuid::Uuid::new_v4();
+                            let id = worker::GlobalWorkID::new(worker::MINE_WORK_IDENTIFIER, &position);
 
-                            event_writer.send(
+                            register_work_ew.send(
                                 worker::RegisterGlobalWorkEvent::new(
                                     worker::GlobalWork::new(
-                                        Task::Mine((position, id)),
+                                        Task::Mine((position, id.clone())),
                                         id,
                                         position,
-                                    )
+                                    ),
                                 )
                             );
-
-                            counter += 1;
                         }
                     }
-                    println!("Number of events send this frame: {}", counter);
                 },
                 SelectionType::Negative => {
                     for (entity, tile) in &query {
@@ -246,6 +243,7 @@ fn mine_order(
                         //       be removed, remove the entity.
                         for position in &positions {
                             if tile.0 == position.0 && tile.1 == position.1 {
+                                
                                 // NOTE: Despawn the entity.
                                 commands.entity(entity).despawn_recursive();
 
@@ -253,26 +251,14 @@ fn mine_order(
                                 let mut tile = world.get_tile_mut(*position);
                             
                                 tile.marked = false;
-                                /* 
-                                // NOTE: Remove the work from the global work queue.
-                                let mut remove = vec![];
+                                
+                                // NOTE: Send an event to remove the work from `GlobalWorkValidator`.
+                                let id = worker::GlobalWorkID::new(
+                                    worker::MINE_WORK_IDENTIFIER, 
+                                    &(*position).into()
+                                );
 
-                                for (i, work) in global_work_pool.works.iter().enumerate() {
-                                    if let Task::Mine((target, _)) = work.task {
-                                        if (target.x as usize == position.0) && 
-                                           (target.y as usize == position.1) {
-                                            
-                                            if !remove.contains(&i) {
-                                                remove.push(i);
-                                            }
-                                        }
-                                    }
-                                }
-
-                                for i in remove {
-                                    global_work_pool.works.remove(i);
-                                }
-                                */
+                                remove_work_ew.send(worker::RemoveGlobalWorkEvent::new(id));
 
                                 break;
                             }

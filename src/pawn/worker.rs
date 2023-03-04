@@ -1,7 +1,6 @@
 #![allow(unused_variables, unused_mut)]
 use std::collections::{VecDeque, HashMap};
 use bevy::prelude::*;
-use uuid::Uuid;
 
 use crate::{
     world::{self, tile}, 
@@ -18,11 +17,13 @@ pub struct WorkerPlugin;
 impl Plugin for WorkerPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<MineTileEvent>()
+            .add_event::<RemoveGlobalWorkEvent>()
             .add_event::<RegisterGlobalWorkEvent>()
             .add_startup_system_to_stage(StartupStage::PostStartup, setup_global_work_pool)
             .add_system_to_stage(CoreStage::PreUpdate, worker_behaviour)
             .add_system_to_stage(CoreStage::PreUpdate, check_inaccessible_works)
             .add_system_to_stage(CoreStage::PostUpdate, register_global_work_event)
+            .add_system_to_stage(CoreStage::PostUpdate, remove_global_work_event)
             .add_system_to_stage(CoreStage::PostUpdate, mine_tile_event);
     }
 }
@@ -36,17 +37,37 @@ pub const MAX_WORK_RECHECK_COUNT: usize = 20;
 // NOTE: Treshold for maximum number of accessible tasks for a pawn.
 pub const MAX_ACCESSIBLE_WORK_TRESHOLD: usize = 300;
 
+// NOTE: Work identifiers
+pub const MINE_WORK_IDENTIFIER: &str = "m";
+
+// NOTE: Identifier used to distinguish between works, first letter
+//       is a code for the type and the numbers are the position.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct GlobalWorkID {
+    id: String,
+}
+
+impl GlobalWorkID {
+    pub fn new(work_identifier: &str, position: &Position) -> Self {
+        Self {
+            id: work_identifier.to_string() + 
+                &position.x.to_string() + 
+                &position.y.to_string(),
+        }
+    }
+}
+
 // NOTE: Any kind of work which should be executed by a worker,
 //       every work has its unique id to identify it.
 #[derive(Debug, Clone)]
 pub struct GlobalWork {
-    pub id: Uuid,
+    pub id: GlobalWorkID,
     pub task: Task,
     pub position: Position,
 }
 
 impl GlobalWork {
-    pub fn new(task: Task, id: Uuid, position: Position) -> Self {
+    pub fn new(task: Task, id: GlobalWorkID, position: Position) -> Self {
         Self {
             id,
             task,
@@ -58,7 +79,7 @@ impl GlobalWork {
 // NOTE: Resource which holds every avaiable work for the workers.
 #[derive(Resource)]
 pub struct GlobalWorkValidator {
-    pub works: HashMap<Uuid, bool>,
+    pub works: HashMap<GlobalWorkID, bool>,
 }
 
 impl Default for GlobalWorkValidator {
@@ -71,23 +92,23 @@ impl Default for GlobalWorkValidator {
 
 #[allow(dead_code)]
 impl GlobalWorkValidator {
-    pub fn validate(&mut self, id: &Uuid) -> Option<&bool> {
+    pub fn validate(&mut self, id: &GlobalWorkID) -> Option<&bool> {
         return self.works.get(id);
     }
 
-    pub fn set_occupied(&mut self, id: &Uuid, occupied: bool) -> bool {
+    pub fn set_occupied(&mut self, id: &GlobalWorkID, occupied: bool) -> bool {
         if let Some(v) = self.works.get_mut(id) {
             *v = occupied;
         }
         return false;
     }
 
-    pub fn remove_work(&mut self, id: &Uuid) -> Option<bool> {
+    pub fn remove_work(&mut self, id: &GlobalWorkID) -> Option<bool> {
         return self.works.remove(id);
     }
 
     pub fn push_work(&mut self, work: &GlobalWork) {
-        self.works.insert(work.id, false);
+        self.works.insert(work.id.clone(), false);
     }
 }
 
@@ -101,13 +122,26 @@ pub struct Worker {
 
 // NOTE: Event that is used to send a global work to worker pawns.
 pub struct RegisterGlobalWorkEvent {
-    work: GlobalWork
+    work: GlobalWork,
 }
 
 impl RegisterGlobalWorkEvent {
     pub fn new(work: GlobalWork) -> Self {
         Self {
             work,
+        }
+    }
+}
+
+// NOTE: Event that is used to remove a `GlobalWork` from the `GlobalWorkValidator`.
+pub struct RemoveGlobalWorkEvent {
+    id: GlobalWorkID,
+}
+
+impl RemoveGlobalWorkEvent {
+    pub fn new(id: GlobalWorkID) -> Self {
+        Self {
+            id
         }
     }
 }
@@ -258,7 +292,7 @@ fn worker_behaviour(
                     },
                     // NOTE: Handle the case of work no longer existing.
                     None => {
-                        occupied.push(work.id);
+                        occupied.push(work.id.clone());
                     }
                 }
 
@@ -308,33 +342,8 @@ fn worker_behaviour(
     }
 }
 
-
-fn register_global_work_event(
-    mut query: Query<(&Position, &mut Worker)>,
-    mut gw_validator: ResMut<GlobalWorkValidator>,
-    mut event_reader: EventReader<RegisterGlobalWorkEvent>,
-    world: Res<world::World>,
-) {
-    for e in event_reader.iter() {
-        for (position, mut worker) in &mut query {
-            let result = find_best_path_to_target(
-                position, &e.work.position, &world
-            );
-
-            match result {
-                Some(_) => {
-                    worker.accessible.push(e.work.clone());
-                },
-                None => {
-                    worker.inaccessible.push(e.work.clone());
-                }
-            }
-
-            gw_validator.push_work(&e.work);
-        }
-    }
-}
-
+// NOTE: Checks every workers inaccessible works and
+//       promotes them to accessible ones.
 fn check_inaccessible_works(
     mut query: Query<(&Position, &mut Worker)>,
     mut gw_validator: ResMut<GlobalWorkValidator>,
@@ -359,7 +368,7 @@ fn check_inaccessible_works(
     
             match result {
                 Some(_) => {
-                    promote.push(work.id);
+                    promote.push(work.id.clone());
                 },
                 None => {}
             }
@@ -372,13 +381,10 @@ fn check_inaccessible_works(
 
         // NOTE: Increase the iterator.
         worker.iterator += counter;
-        if worker.iterator >= worker.inaccessible.len() {
-            worker.iterator = 0;
-        }
 
         // NOTE: Promote the selected works.
         let mut iter = 0;
-        while iter < worker.iterator {
+        while (iter < worker.iterator) && (iter < worker.inaccessible.len()) {
             if promote.contains(&worker.inaccessible[iter].id) {
                 // NOTE: Push the work to the accessible list.
                 let work = worker.inaccessible[iter].clone();
@@ -390,6 +396,52 @@ fn check_inaccessible_works(
                 iter += 1;
             }
         }
+
+        // NOTE: Wrap the iterator to start if a cycle is complete.
+        if worker.iterator >= worker.inaccessible.len() {
+            worker.iterator = 0;
+        }
+    }
+}
+
+// NOTE: Adds works to every pawn's respective list depeding on
+//       the accessibility also adds work to the `GlobalWorkValidator`.
+// TODO: Send works to `GlobalWorkValidator` in batches
+//       instead sending all at once.
+fn register_global_work_event(
+    mut query: Query<(&Position, &mut Worker)>,
+    mut gw_validator: ResMut<GlobalWorkValidator>,
+    mut event_reader: EventReader<RegisterGlobalWorkEvent>,
+    world: Res<world::World>,
+) {
+    for e in event_reader.iter() {
+        for (position, mut worker) in &mut query {
+            let result = find_best_path_to_target(
+                position, &e.work.position, &world
+            );
+
+            match result {
+                Some(_) => {
+                    worker.accessible.push(e.work.clone());
+                },
+                None => {
+                    worker.inaccessible.push(e.work.clone());
+                }
+            }
+        }
+
+        gw_validator.push_work(&e.work);
+    }
+}
+
+// NOTE: Removes works from the `GlobalWorkValidator`.
+// TODO: Add error checking here.
+fn remove_global_work_event(
+    mut gw_validator: ResMut<GlobalWorkValidator>,
+    mut event_reader: EventReader<RemoveGlobalWorkEvent>,
+) {
+    for e in event_reader.iter() {
+        gw_validator.remove_work(&e.id);
     }
 }
 
