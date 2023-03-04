@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_egui::{egui::{self, RichText, Color32}, EguiContext};
 
 use crate::{
-    pawn::prelude::*,
+    pawn::{prelude::*, worker},
     player::resource::prelude::*,
 };
 
@@ -20,10 +20,10 @@ impl Plugin for InspectorPlugin {
 fn inspector(
     mut egui_context: ResMut<EguiContext>,
     player_resources: Res<PlayerResources>,
-    query: Query<(&Selectable, &Name, &Health, &Alignment), With<Pawn>>
+    query: Query<(&Selectable, &Name, &Health, &Alignment, Option<&worker::Worker>), With<Pawn>>
 ) {
     // NOTE: Prepare a list to sort by status of the `Player` component.
-    let mut sorted: Vec<(&Selectable, &Name, &Health, &Alignment)> = vec![];
+    let mut sorted: Vec<(&Selectable, &Name, &Health, &Alignment, Option<&worker::Worker>)> = vec![];
 
     // NOTE: Display all the selected pawns.
     for tuple in &query {
@@ -73,7 +73,7 @@ fn inspector(
             ui.heading("Inspector");
             ui.separator();
 
-            for (selectable, name, health, alignment) in &sorted {
+            for (selectable, name, health, alignment, worker) in &sorted {
                 if selectable.selected {
                     ui.horizontal(|ui| {
                         let color = alignment.color32();
@@ -92,6 +92,10 @@ fn inspector(
                             format!("{} | {}", health.maximum, health.current
                         )).color(Color32::GREEN));
                     });
+
+                    if let Some(w) = worker {
+                        ui.label(format!("Work Pool | A : {}, I : {}", w.accessible.len(), w.inaccessible.len()));
+                    }
                 }
             }
         });

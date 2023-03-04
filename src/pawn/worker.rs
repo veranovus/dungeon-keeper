@@ -21,6 +21,7 @@ impl Plugin for WorkerPlugin {
             .add_event::<RegisterGlobalWorkEvent>()
             .add_startup_system_to_stage(StartupStage::PostStartup, setup_global_work_pool)
             .add_system_to_stage(CoreStage::PreUpdate, worker_behaviour)
+            .add_system_to_stage(CoreStage::PreUpdate, check_inaccessible_works)
             .add_system_to_stage(CoreStage::PostUpdate, register_global_work_event)
             .add_system_to_stage(CoreStage::PostUpdate, mine_tile_event);
     }
@@ -28,6 +29,12 @@ impl Plugin for WorkerPlugin {
 
 // NOTE: Default glyph that is used for worker pawns.
 pub const DEFAULT_WORKER_PAWN_GLYPH: usize = 1;
+
+// NOTE: Amount of works to be recheched for every worker at once.
+pub const MAX_WORK_RECHECK_COUNT: usize = 20;
+
+// NOTE: Treshold for maximum number of accessible tasks for a pawn.
+pub const MAX_ACCESSIBLE_WORK_TRESHOLD: usize = 300;
 
 // NOTE: Any kind of work which should be executed by a worker,
 //       every work has its unique id to identify it.
@@ -87,8 +94,9 @@ impl GlobalWorkValidator {
 // NOTE: Tag that is used to distinguish worker pawns.
 #[derive(Component)]
 pub struct Worker {
-    accessible: Vec<GlobalWork>,
-    inaccessible: Vec<GlobalWork>,
+    pub accessible: Vec<GlobalWork>,
+    pub inaccessible: Vec<GlobalWork>,
+    iterator: usize,
 }
 
 // NOTE: Event that is used to send a global work to worker pawns.
@@ -100,32 +108,6 @@ impl RegisterGlobalWorkEvent {
     pub fn new(work: GlobalWork) -> Self {
         Self {
             work,
-        }
-    }
-}
-
-pub fn register_global_work_event(
-    mut query: Query<(&Position, &mut Worker)>,
-    mut gw_validator: ResMut<GlobalWorkValidator>,
-    mut event_reader: EventReader<RegisterGlobalWorkEvent>,
-    world: Res<world::World>,
-) {
-    for e in event_reader.iter() {
-        for (position, mut worker) in &mut query {
-            let result = find_best_path_to_target(
-                position, &e.work.position, &world
-            );
-
-            match result {
-                Some(_) => {
-                    worker.accessible.push(e.work.clone());
-                },
-                None => {
-                    worker.inaccessible.push(e.work.clone());
-                }
-            }
-
-            gw_validator.push_work(&e.work);
         }
     }
 }
@@ -152,8 +134,9 @@ pub fn spawn_worker_pawn(
     );
 
     commands.entity(e).insert(Worker {
-        accessible: vec![],
-        inaccessible: vec![],
+        accessible: Vec::with_capacity(500),
+        inaccessible: Vec::with_capacity(500),
+        iterator: 0,
     });
 
     return e;
@@ -262,7 +245,7 @@ fn worker_behaviour(
             let mut close = f32::MAX;
 
             // NOTE: Exhausted works
-            let mut exhausted = vec![];
+            let mut occupied = vec![];
 
             for (i, work) in worker.accessible.iter().enumerate() {
                 // NOTE: Validate the work.
@@ -275,7 +258,7 @@ fn worker_behaviour(
                     },
                     // NOTE: Handle the case of work no longer existing.
                     None => {
-                        exhausted.push(i);
+                        occupied.push(work.id);
                     }
                 }
 
@@ -313,8 +296,98 @@ fn worker_behaviour(
             }
 
             // NOTE: Remove exhausted works from the work list
-            for i in exhausted {
-                worker.accessible.remove(i);
+            let mut iter = 0;
+            while iter < worker.accessible.len() {
+                if occupied.contains(&worker.accessible[iter].id) {
+                    worker.accessible.remove(iter);
+                } else {
+                    iter += 1;
+                }
+            }
+        }
+    }
+}
+
+
+fn register_global_work_event(
+    mut query: Query<(&Position, &mut Worker)>,
+    mut gw_validator: ResMut<GlobalWorkValidator>,
+    mut event_reader: EventReader<RegisterGlobalWorkEvent>,
+    world: Res<world::World>,
+) {
+    for e in event_reader.iter() {
+        for (position, mut worker) in &mut query {
+            let result = find_best_path_to_target(
+                position, &e.work.position, &world
+            );
+
+            match result {
+                Some(_) => {
+                    worker.accessible.push(e.work.clone());
+                },
+                None => {
+                    worker.inaccessible.push(e.work.clone());
+                }
+            }
+
+            gw_validator.push_work(&e.work);
+        }
+    }
+}
+
+fn check_inaccessible_works(
+    mut query: Query<(&Position, &mut Worker)>,
+    mut gw_validator: ResMut<GlobalWorkValidator>,
+    world: Res<world::World>,
+) {
+    for (position, mut worker) in &mut query {
+        if worker.accessible.len() > MAX_ACCESSIBLE_WORK_TRESHOLD {
+            continue;
+        }
+
+        let mut counter = 0;
+        let mut promote = vec![];
+
+        // NOTE: Check if a work become accesssible,
+        //       if so add it to promotion vector.
+        for i in worker.iterator..worker.inaccessible.len() {
+            let work = &worker.inaccessible[i];
+
+            let result = find_best_path_to_target(
+                position, &work.position, &world
+            );
+    
+            match result {
+                Some(_) => {
+                    promote.push(work.id);
+                },
+                None => {}
+            }
+
+            counter +=1;
+            if counter == MAX_WORK_RECHECK_COUNT {
+                break;
+            }
+        }
+
+        // NOTE: Increase the iterator.
+        worker.iterator += counter;
+        if worker.iterator >= worker.inaccessible.len() {
+            worker.iterator = 0;
+        }
+
+        // NOTE: Promote the selected works.
+        let mut iter = 0;
+        while iter < worker.iterator {
+            if promote.contains(&worker.inaccessible[iter].id) {
+                // NOTE: Push the work to the accessible list.
+                let work = worker.inaccessible[iter].clone();
+                worker.accessible.push(work);
+
+                // NOTE: Remove the work from inaccessible list.
+                worker.inaccessible.remove(iter);
+            } else {
+                iter += 1;
             }
         }
     }
