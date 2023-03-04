@@ -70,7 +70,7 @@ pub fn pawn_act_turn(
     transform: &mut Transform,
     position: &mut Position,
     world: &mut world::World,
-    global_work_pool: &mut worker::GlobalWorkPool,
+    gw_validator: &mut worker::GlobalWorkValidator,
     mine_tile_er: &mut EventWriter<worker::MineTileEvent>,
 ) {
     match &mut task_queue.active {
@@ -127,10 +127,10 @@ pub fn pawn_act_turn(
         Task::Attack(_) => {},
         Task::Mine((target, id)) => {
             // NOTE: Get the current work from the pool
-            let result = global_work_pool.get_work_mut(id);
+            let result = gw_validator.validate(id);
 
             match result {
-                Some(work) => {
+                Some(_) => {
                     // NOTE: Calculate the distance to the target tile.
                     let dist = Vec2::new(
                         (target.x - position.x).abs() as f32,
@@ -140,12 +140,12 @@ pub fn pawn_act_turn(
                     // NOTE: If the pawn failed to reach to the target tile
                     //       for some reason, set work to unoccupied again.
                     if dist > f32::sqrt(2.0) {
-                        work.occupied = false;
+                        gw_validator.set_occupied(id, false);
                     } else {
-                        // NOTE: Otherwise remove the work from the `GlobalWorkPool`.
-                        let result = global_work_pool.remove_work(id);
+                        // NOTE: Otherwise remove the work from the `GlobalWorkValidator`.
+                        let result = gw_validator.remove_work(id);
 
-                        if !result {
+                        if let None = result {
                             error!("Failed to remove work from the `GlobalWorkPool`, this should have never happened.");
                             panic!();
                         }
@@ -158,6 +158,8 @@ pub fn pawn_act_turn(
                     info!("Failed to get work from the `GlobalWorkPool`, mine task is skipped.");
                 }
             }
+            
+            println!("WORK-ID: {}", id);
         },
     }
 

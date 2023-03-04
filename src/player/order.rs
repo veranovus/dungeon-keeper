@@ -152,7 +152,7 @@ fn mine_order(
     mut commands: Commands,
     mut world: ResMut<world::World>,
     mut event_reader: EventReader<SelectionEvent>,
-    mut global_work_pool: ResMut<worker::GlobalWorkPool>,
+    mut event_writer: EventWriter<worker::RegisterGlobalWorkEvent>,
     query: Query<(Entity, &Position), With<MineOrderIndicator>>,
     tileset: Res<tileset::Tileset>,
 ) {
@@ -193,6 +193,7 @@ fn mine_order(
             //       delete or create new indicators.
             match e.selection_type {
                 SelectionType::Possitive => {
+                    let mut counter = 0;
                     for position in &positions {
                         if world.is_solid_tile(*position) && !world.get_tile(*position).marked{
                             // NOTE: Setup the mine-task shadow entity..
@@ -218,17 +219,24 @@ fn mine_order(
 
                             tile.marked = true;
 
-                            // NOTE: Push the work to the global work pool
+                            // NOTE: Send the `RegisterGlobalWorkEvent`.
+                            let position: Position = (*position).into();
                             let id = uuid::Uuid::new_v4();
 
-                            global_work_pool.works.push(
-                                worker::GlobalWork::new(
-                                    Task::Mine(((*position).into(), id)),
-                                    id,
+                            event_writer.send(
+                                worker::RegisterGlobalWorkEvent::new(
+                                    worker::GlobalWork::new(
+                                        Task::Mine((position, id)),
+                                        id,
+                                        position,
+                                    )
                                 )
                             );
+
+                            counter += 1;
                         }
                     }
+                    println!("Number of events send this frame: {}", counter);
                 },
                 SelectionType::Negative => {
                     for (entity, tile) in &query {
@@ -245,7 +253,7 @@ fn mine_order(
                                 let mut tile = world.get_tile_mut(*position);
                             
                                 tile.marked = false;
-
+                                /* 
                                 // NOTE: Remove the work from the global work queue.
                                 let mut remove = vec![];
 
@@ -264,6 +272,7 @@ fn mine_order(
                                 for i in remove {
                                     global_work_pool.works.remove(i);
                                 }
+                                */
 
                                 break;
                             }

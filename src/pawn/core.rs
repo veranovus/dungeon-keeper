@@ -287,7 +287,7 @@ pub fn pawn_find_path(
 fn process_pawn_turns(
     mut query: Query<(Entity, &mut TaskQueue, &mut Transform, &mut Position), With<Pawn>>,
     mut world: ResMut<world::World>,
-    mut global_work_pool: ResMut<worker::GlobalWorkPool>,
+    mut global_work_pool: ResMut<worker::GlobalWorkValidator>,
     mut event_reader: EventReader<turn_system::TurnOverEvent>,
     mut mine_tile_ew: EventWriter<worker::MineTileEvent>,
 ) {

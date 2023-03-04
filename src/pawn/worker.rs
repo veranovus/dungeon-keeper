@@ -1,7 +1,7 @@
 #![allow(unused_variables, unused_mut)]
-use std::collections::VecDeque;
-use log::error;
+use std::collections::{VecDeque, HashMap};
 use bevy::prelude::*;
+use uuid::Uuid;
 
 use crate::{
     world::{self, tile}, 
@@ -18,8 +18,10 @@ pub struct WorkerPlugin;
 impl Plugin for WorkerPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<MineTileEvent>()
+            .add_event::<RegisterGlobalWorkEvent>()
             .add_startup_system_to_stage(StartupStage::PostStartup, setup_global_work_pool)
             .add_system_to_stage(CoreStage::PreUpdate, worker_behaviour)
+            .add_system_to_stage(CoreStage::PostUpdate, register_global_work_event)
             .add_system_to_stage(CoreStage::PostUpdate, mine_tile_event);
     }
 }
@@ -29,71 +31,104 @@ pub const DEFAULT_WORKER_PAWN_GLYPH: usize = 1;
 
 // NOTE: Any kind of work which should be executed by a worker,
 //       every work has its unique id to identify it.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GlobalWork {
-    pub id: uuid::Uuid,
+    pub id: Uuid,
     pub task: Task,
-    pub occupied: bool,
+    pub position: Position,
 }
 
 impl GlobalWork {
-    pub fn new(task: Task, id: uuid::Uuid) -> Self {
+    pub fn new(task: Task, id: Uuid, position: Position) -> Self {
         Self {
             id,
             task,
-            occupied: false,
+            position,
         }
     }
 }
 
 // NOTE: Resource which holds every avaiable work for the workers.
 #[derive(Resource)]
-pub struct GlobalWorkPool {
-    pub works: Vec<GlobalWork>,
+pub struct GlobalWorkValidator {
+    pub works: HashMap<Uuid, bool>,
+}
+
+impl Default for GlobalWorkValidator {
+    fn default() -> Self {
+        Self {
+            works: HashMap::new(),
+        }
+    }
 }
 
 #[allow(dead_code)]
-impl GlobalWorkPool {
-    pub fn get_work(&self, id: &uuid::Uuid) -> Option<&GlobalWork> {
-        for work in &self.works {
-            if work.id == *id {
-                return Some(work);
-            }
-        }
-        return None;
+impl GlobalWorkValidator {
+    pub fn validate(&mut self, id: &Uuid) -> Option<&bool> {
+        return self.works.get(id);
     }
 
-    pub fn get_work_mut(&mut self, id: &uuid::Uuid) -> Option<&mut GlobalWork> {
-        for work in &mut self.works {
-            if work.id == *id {
-                return Some(work);
-            }
+    pub fn set_occupied(&mut self, id: &Uuid, occupied: bool) -> bool {
+        if let Some(v) = self.works.get_mut(id) {
+            *v = occupied;
         }
-        return None;
+        return false;
     }
 
-    pub fn remove_work(&mut self, id: &uuid::Uuid) -> bool {
-        let mut index = -1;
-        for (i, work) in self.works.iter().enumerate() {
-            if work.id == *id {
-                index = i as i32;
-                break;
-            }
-        }
+    pub fn remove_work(&mut self, id: &Uuid) -> Option<bool> {
+        return self.works.remove(id);
+    }
 
-        if index == -1 {
-            return false;
-        } else {
-            self.works.remove(index as usize);
-
-            return true
-        }
+    pub fn push_work(&mut self, work: &GlobalWork) {
+        self.works.insert(work.id, false);
     }
 }
 
 // NOTE: Tag that is used to distinguish worker pawns.
 #[derive(Component)]
-pub struct Worker;
+pub struct Worker {
+    accessible: Vec<GlobalWork>,
+    inaccessible: Vec<GlobalWork>,
+}
+
+// NOTE: Event that is used to send a global work to worker pawns.
+pub struct RegisterGlobalWorkEvent {
+    work: GlobalWork
+}
+
+impl RegisterGlobalWorkEvent {
+    pub fn new(work: GlobalWork) -> Self {
+        Self {
+            work,
+        }
+    }
+}
+
+pub fn register_global_work_event(
+    mut query: Query<(&Position, &mut Worker)>,
+    mut gw_validator: ResMut<GlobalWorkValidator>,
+    mut event_reader: EventReader<RegisterGlobalWorkEvent>,
+    world: Res<world::World>,
+) {
+    for e in event_reader.iter() {
+        for (position, mut worker) in &mut query {
+            let result = find_best_path_to_target(
+                position, &e.work.position, &world
+            );
+
+            match result {
+                Some(_) => {
+                    worker.accessible.push(e.work.clone());
+                },
+                None => {
+                    worker.inaccessible.push(e.work.clone());
+                }
+            }
+
+            gw_validator.push_work(&e.work);
+        }
+    }
+}
 
 // NOTE: Event that is sent when a worker mines a tile.
 #[derive(Clone, Copy)]
@@ -116,16 +151,17 @@ pub fn spawn_worker_pawn(
         Alignment::Player
     );
 
-    commands.entity(e).insert(Worker);
+    commands.entity(e).insert(Worker {
+        accessible: vec![],
+        inaccessible: vec![],
+    });
 
     return e;
 }
 
 // NOTE: Setup the `GlobalWorkPool` resource.
 fn setup_global_work_pool(mut commands: Commands) {
-    commands.insert_resource(GlobalWorkPool {
-        works: vec![],
-    });
+    commands.insert_resource(GlobalWorkValidator::default());
 }
 
 // NOTE: Find the best position around the target
@@ -194,29 +230,13 @@ fn find_best_path_to_target(
 // NOTE: Returns the distance between a pawn an a global task.
 fn distance_to_work(
     position: &Position,
-    task: &Task,
+    work: &GlobalWork,
     world: &world::World
 ) -> f32 {
-    return match task {
-        Task::Mine((target, _)) => {
-            // NOTE: Check if a path exist to target tile
-            let path = find_best_path_to_target(position, target, world);
-
-            // NOTE: If no path exists return a negative score for the distance
-            if let None = path {
-                return -1.0;
-            }
-
-            Vec2::new(
-                (target.x - position.x) as f32, 
-                (target.y - position.y) as f32
-            ).length()
-        },
-        _ => {
-            error!("Encountered an unimplemented or wrong type of task for a global work.");
-            panic!()
-        }
-    }
+    return Vec2::new(
+        (work.position.x - position.x) as f32, 
+        (work.position.y - position.y) as f32
+    ).length();
 }
 
 // NOTE: Behaviour code which determines what workers do under certain
@@ -225,11 +245,11 @@ fn distance_to_work(
 //       [_] - Construct buildings.
 //       [_] - Repair buildings.
 fn worker_behaviour(
-    mut query: Query<(Entity, &Position, &mut TaskQueue), With<Worker>>,
-    mut global_work_pool: ResMut<GlobalWorkPool>,
+    mut query: Query<(Entity, &Position, &mut TaskQueue, &mut Worker)>,
+    mut gw_validator: ResMut<GlobalWorkValidator>,
     world: Res<world::World>,
 ) {
-    for (e, position, mut tq) in &mut query {
+    for (e, position, mut tq, mut worker) in &mut query {
         let active = if let Task::None = tq.active { 
             false 
         } else { 
@@ -241,13 +261,26 @@ fn worker_behaviour(
             let mut index = -1;
             let mut close = f32::MAX;
 
-            for (i, work) in global_work_pool.works.iter().enumerate() {
-                // NOTE: Skip the task if it's alrady occupied.
-                if work.occupied {
-                    continue;
+            // NOTE: Exhausted works
+            let mut exhausted = vec![];
+
+            for (i, work) in worker.accessible.iter().enumerate() {
+                // NOTE: Validate the work.
+                match gw_validator.validate(&work.id) {
+                    Some(occupied) => {
+                        // NOTE: Skip the work if it's alrady occupied.
+                        if *occupied {
+                            continue;
+                        }
+                    },
+                    // NOTE: Handle the case of work no longer existing.
+                    None => {
+                        exhausted.push(i);
+                    }
                 }
 
-                let dist = distance_to_work(position, &work.task, &world);
+                // NOTE: Find the distance to the work.
+                let dist = distance_to_work(position, &work, &world);
 
                 // NOTE: If that work is inaccessible skip it.
                 if dist < 0.0 {
@@ -260,32 +293,28 @@ fn worker_behaviour(
                 }
             }
 
-            // NOTE: If no work is available just continue.
-            if index == -1 {
-                continue;
+            // NOTE: If a work is available task it.
+            if index != -1 {
+                let work = worker.accessible.get_mut(index as usize).unwrap();
+
+                // NOTE: Find the best nearest position around work.
+                let result = find_best_path_to_target(position, &work.position, &world);
+
+                // NOTE: Send the required taks to worker.
+                if let Some(mt) = result {
+                    tq.queue.push_back(Task::Move(mt));
+                    tq.queue.push_back(work.task.clone());
+                } else {
+                    continue;
+                }
+
+                // NOTE: Mark the work as occupied.
+                gw_validator.set_occupied(&work.id, true);
             }
 
-            // NOTE: Get the nearest task
-            let work = global_work_pool.works.get_mut(index as usize).unwrap();
-
-            // NOTE: Find the best nearest position around work.
-            match work.task {
-                Task::Mine((target, id)) => {
-                    let result = find_best_path_to_target(position, &target, &world);
-
-                    // NOTE: Send the required taks to worker.
-                    if let Some(mt) = result {
-                        tq.queue.push_back(Task::Move(mt));
-                        tq.queue.push_back(Task::Mine((target, id)));
-                    } else {
-                        error!("Failed to find a path to work, this error should've never occured.");
-                        panic!();
-                    }
-
-                    // NOTE: Mark the work as occupied.
-                    work.occupied = true;
-                }, 
-                _ => {}
+            // NOTE: Remove exhausted works from the work list
+            for i in exhausted {
+                worker.accessible.remove(i);
             }
         }
     }
