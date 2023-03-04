@@ -31,6 +31,18 @@ pub enum Task {
     Mine((Position, uuid::Uuid)),
 }
 
+#[allow(dead_code)]
+impl Task {
+    pub fn name(&self) -> String {
+        match self {
+            Task::None => "None",
+            Task::Move(_) => "Move",
+            Task::Attack(_) => "Attack",
+            Task::Mine(_) => "Mine",
+        }.to_string()
+    } 
+}
+
 // NOTE: A component that holds the tasks
 //       queue and active task of a pawn.
 #[derive(Component)]

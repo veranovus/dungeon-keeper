@@ -178,7 +178,7 @@ fn find_best_path_to_target(
         }
     }
 
-    if best_pos.x == -1 && best_pos.y == -1 {
+    if best_path.is_empty() {
         return None;
     } else {
         // NOTE: Remove the initial position from the path.
@@ -306,6 +306,7 @@ fn mine_tile_event(
         return;
     }
 
+    // NOTE: Process events and store their positions.
     let mut targets = vec![];
 
     for e in event_reader.iter() {
@@ -343,7 +344,7 @@ fn mine_tile_event(
         commands.entity(e).despawn();
     }
 
-    // NOTE: Change tiles in the position array.
+    // NOTE: Change tiles with the same positions in the array.
     for (position, res, mut tile) in &mut tiles {
         let mut index = -1;
         for (i, target) in targets.iter().enumerate() {
