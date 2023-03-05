@@ -141,12 +141,14 @@ pub fn pawn_act_turn(
                     //       for some reason, set work to unoccupied again.
                     if dist > f32::sqrt(2.0) {
                         gw_validator.set_occupied(id, false);
+
+                        info!("Failed to reach to the current work, mine task is skipped.");
                     } else {
                         // NOTE: Otherwise remove the work from the `GlobalWorkValidator`.
                         let result = gw_validator.remove_work(id);
 
                         if let None = result {
-                            error!("Failed to remove work from the `GlobalWorkPool`, this should have never happened.");
+                            error!("Failed to remove work from the `GlobalWorkValidator`, this should have never happened.");
                             panic!();
                         }
 
@@ -155,7 +157,7 @@ pub fn pawn_act_turn(
                     }
                 },
                 None => {
-                    info!("Failed to get work from the `GlobalWorkPool`, mine task is skipped.");
+                    info!("Failed to validate work from the `GlobalWorkValidator`, mine task is skipped.");
                 }
             }
         },

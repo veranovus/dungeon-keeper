@@ -256,11 +256,7 @@ fn distance_to_work(
     ).length();
 }
 
-// NOTE: Behaviour code which determines what workers do under certain
-//       circumstances, worker capabilities (Not all implemented):
-//       [X] - Mine tiles.
-//       [_] - Construct buildings.
-//       [_] - Repair buildings.
+// NOTE: Behaviour code which determines what workers do under certain circumstances.
 fn worker_behaviour(
     mut query: Query<(Entity, &Position, &mut TaskQueue, &mut Worker)>,
     mut gw_validator: ResMut<GlobalWorkValidator>,
@@ -268,9 +264,9 @@ fn worker_behaviour(
 ) {
     for (e, position, mut tq, mut worker) in &mut query {
         let active = if let Task::None = tq.active { 
-            false 
+            false
         } else { 
-            true 
+            true
         };
 
         if !active && tq.queue.is_empty() {
@@ -293,16 +289,12 @@ fn worker_behaviour(
                     // NOTE: Handle the case of work no longer existing.
                     None => {
                         occupied.push(work.id.clone());
+                        continue;
                     }
                 }
 
                 // NOTE: Find the distance to the work.
                 let dist = distance_to_work(position, &work, &world);
-
-                // NOTE: If that work is inaccessible skip it.
-                if dist < 0.0 {
-                    continue;
-                }
 
                 if dist < close {
                     close = dist;
@@ -355,22 +347,28 @@ fn check_inaccessible_works(
         }
 
         let mut counter = 0;
-        let mut promote = vec![];
 
-        // NOTE: Check if a work become accesssible,
-        //       if so add it to promotion vector.
+        let mut promote = vec![];
+        let mut invalid = vec![];
+
+        // NOTE: Check if a work become accesssible, if so add it to promotion vector.
+        //       Also checks if that work still exists, if so add it to removal vector.
         for i in worker.iterator..worker.inaccessible.len() {
             let work = &worker.inaccessible[i];
 
-            let result = find_best_path_to_target(
-                position, &work.position, &world
-            );
-    
-            match result {
-                Some(_) => {
-                    promote.push(work.id.clone());
-                },
-                None => {}
+            if let None = gw_validator.validate(&work.id) {
+                invalid.push(work.id.clone());
+            } else {
+                let result = find_best_path_to_target(
+                    position, &work.position, &world
+                );
+        
+                match result {
+                    Some(_) => {
+                        promote.push(work.id.clone());
+                    },
+                    None => {}
+                }
             }
 
             counter +=1;
@@ -391,6 +389,9 @@ fn check_inaccessible_works(
                 worker.accessible.push(work);
 
                 // NOTE: Remove the work from inaccessible list.
+                worker.inaccessible.remove(iter);
+            } else if invalid.contains(&worker.inaccessible[iter].id) {
+                // NOTE: Remove the work if it doesn't exists anymore.
                 worker.inaccessible.remove(iter);
             } else {
                 iter += 1;
