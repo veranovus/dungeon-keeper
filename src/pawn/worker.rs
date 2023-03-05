@@ -1,4 +1,3 @@
-#![allow(unused_variables, unused_mut)]
 use std::collections::{VecDeque, HashMap};
 use bevy::prelude::*;
 
@@ -248,7 +247,6 @@ fn find_best_path_to_target(
 fn distance_to_work(
     position: &Position,
     work: &GlobalWork,
-    world: &world::World
 ) -> f32 {
     return Vec2::new(
         (work.position.x - position.x) as f32, 
@@ -258,11 +256,11 @@ fn distance_to_work(
 
 // NOTE: Behaviour code which determines what workers do under certain circumstances.
 fn worker_behaviour(
-    mut query: Query<(Entity, &Position, &mut TaskQueue, &mut Worker)>,
+    mut query: Query<(&Position, &mut TaskQueue, &mut Worker)>,
     mut gw_validator: ResMut<GlobalWorkValidator>,
     world: Res<world::World>,
 ) {
-    for (e, position, mut tq, mut worker) in &mut query {
+    for (position, mut tq, mut worker) in &mut query {
         let active = if let Task::None = tq.active { 
             false
         } else { 
@@ -294,7 +292,7 @@ fn worker_behaviour(
                 }
 
                 // NOTE: Find the distance to the work.
-                let dist = distance_to_work(position, &work, &world);
+                let dist = distance_to_work(position, &work);
 
                 if dist < close {
                     close = dist;
@@ -452,7 +450,7 @@ fn mine_tile_event(
     mut commands: Commands,
     mut world: ResMut<world::World>,
     mut event_reader: EventReader<MineTileEvent>,
-    mut tiles: Query<(&Position, &tile::Resource, &mut tile::Tile)>,
+    mut tiles: Query<(&Position, &mut tile::Tile)>,
     mut player_resources: ResMut<resource::PlayerResources>,
     indicators: Query<(Entity, &Position), With<order::MineOrderIndicator>>,
 ) {
@@ -500,7 +498,7 @@ fn mine_tile_event(
     }
 
     // NOTE: Change tiles with the same positions in the array.
-    for (position, res, mut tile) in &mut tiles {
+    for (position, mut tile) in &mut tiles {
         let mut index = -1;
         for (i, target) in targets.iter().enumerate() {
             if position == target {
