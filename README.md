@@ -2,7 +2,7 @@
 
 A Tower Defense, Dungeon Management kind of game, but also inspired by Dwarf Fortress? Even I don't know where this game will go over time.
 
-> Version 0.2.0.7_@wr0.5
+> Version 0.2.0.8
 
 ## Changelog
 
@@ -15,7 +15,9 @@ A Tower Defense, Dungeon Management kind of game, but also inspired by Dwarf For
 - Fixed bug which caused works being stuck in the inaccessible list of workers.
 - Fixed bug which caused workers to accept non-existent works.
 - Removed unused use statements and variables.
+- Merged the `work-refactor` branch with the master branch.
 
 ## TO-DO
 
 - Handle work register and remove events in batches, rather than handling them in a single frame.
+- Handle the bug which results in a crash when a mine order is tasked in the world borders.

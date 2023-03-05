@@ -8,7 +8,7 @@ use bevy::sprite::Anchor;
 
 // NOTE: Initial window size for the application
 pub const WINDOW_SIZE: (usize, usize) = (800, 600);
-pub const WINDOW_TITLE: &str = "Dungeon Keeper | v0.2.0.7_@wr0.5";
+pub const WINDOW_TITLE: &str = "Dungeon Keeper | v0.2.0.8";
 
 // ##### SPRITE #####
 
