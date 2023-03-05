@@ -76,89 +76,81 @@ pub fn pawn_act_turn(
     match &mut task_queue.active {
         Task::None => {}
         Task::Move(move_task) => {
-            match move_task.path.pop_front() {
-                Some(v) => {
-                    let result = core::move_pawn( 
-                        v.into(),
-                        entity,
-                        transform, 
-                        position, 
+            if let Some (target) = move_task.path.pop_front() {
+                let result = core::move_pawn( 
+                    target.into(),
+                    entity,
+                    transform, 
+                    position, 
+                    world
+                );
+    
+                // NOTE: If next tile on the path is invalid, try to find a new path.
+                if result == false {
+                    info!("Finding a new path for the target location.");
+
+                    let result = core::pawn_find_path(
+                        *position, 
+                        move_task.target, 
                         world
                     );
-        
-                    // NOTE: If next tile on the path is invalid, try to find a new path.
-                    if result == false {
-                        info!("Finding a new path for the target location.");
 
-                        let result = core::pawn_find_path(
-                            *position, 
-                            move_task.target, 
-                            world
-                        );
+                    match result {
+                        // NOTE: If a new path is found push a new movement task to
+                        //       the front of the queue, and skip the current one.
+                        Some((mut path, _)) => {
+                            path.remove(0);
 
-                        match result {
-                            // NOTE: If a new path is found push a new movement task to
-                            //       the front of the queue, and skip the current one.
-                            Some((mut path, _cost)) => {
-                                path.remove(0);
-
-                                task_queue.queue.push_front(Task::Move(MoveTask {
-                                    path: VecDeque::from(path),
-                                    target: move_task.target,
-                                }));
-                            },
-                            // NOTE: Otherwise just skip to the next
-                            //       task, without pushing a new one.
-                            None => {
-                                info!("No possible path found for the target, move task is skipped.");
-                            }
+                            task_queue.queue.push_front(Task::Move(MoveTask {
+                                path: VecDeque::from(path),
+                                target: move_task.target,
+                            }));
+                        },
+                        // NOTE: Otherwise just skip to the next
+                        //       task, without pushing a new one.
+                        None => {
+                            info!("No possible path found for the target, move task is skipped.");
                         }
-                    } else {
-                        // NOTE: If pawn was able to move, return
-                        //       to keep pawn in the move task.
-                        return;
                     }
-                },
-                // NOTE: If there is no tile left in the
-                //       path, get to the next task.
-                None => {}
-            };
+                } else {
+                    // NOTE: If pawn was able to move, return
+                    //       to keep pawn in the move task.
+                    return;
+                }
+            }
         }
         Task::Attack(_) => {},
         Task::Mine((target, id)) => {
             // NOTE: Get the current work from the pool
             let result = gw_validator.validate(id);
 
-            match result {
-                Some(_) => {
-                    // NOTE: Calculate the distance to the target tile.
-                    let dist = Vec2::new(
-                        (target.x - position.x).abs() as f32,
-                        (target.y - position.y).abs() as f32,
-                    ).length();
+            if let Some(_) = result {
+                // NOTE: Calculate the distance to the target tile.
+                let dist = Vec2::new(
+                    (target.x - position.x).abs() as f32,
+                    (target.y - position.y).abs() as f32,
+                ).length();
 
-                    // NOTE: If the pawn failed to reach to the target tile
-                    //       for some reason, set work to unoccupied again.
-                    if dist > f32::sqrt(2.0) {
-                        gw_validator.set_occupied(id, false);
+                // NOTE: If the pawn failed to reach to the target tile
+                //       for some reason, set work to unoccupied again.
+                if dist > f32::sqrt(2.0) {
+                    gw_validator.set_occupied(id, false);
 
-                        info!("Failed to reach to the current work, mine task is skipped.");
-                    } else {
-                        // NOTE: Otherwise remove the work from the `GlobalWorkValidator`.
-                        let result = gw_validator.remove_work(id);
+                    info!("Failed to reach to the current work, mine task is skipped.");
+                } else {
+                    // NOTE: Otherwise remove the work from the `GlobalWorkValidator`.
+                    let result = gw_validator.remove_work(id);
 
-                        if let None = result {
-                            error!("Failed to remove work from the `GlobalWorkValidator`, this should have never happened.");
-                            panic!();
-                        }
-
-                        // NOTE: Send a `MineTileEvent` with given target position.
-                        mine_tile_er.send(worker::MineTileEvent(*target));
+                    if result.is_none() {
+                        error!("Failed to remove work from the `GlobalWorkValidator`, this should have never happened.");
+                        panic!();
                     }
-                },
-                None => {
-                    info!("Failed to validate work from the `GlobalWorkValidator`, mine task is skipped.");
+
+                    // NOTE: Send a `MineTileEvent` with given target position.
+                    mine_tile_er.send(worker::MineTileEvent(*target));
                 }
+            } else {
+                info!("Failed to validate work from the `GlobalWorkValidator`, mine task is skipped.");
             }
         },
     }

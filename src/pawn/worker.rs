@@ -30,7 +30,7 @@ impl Plugin for WorkerPlugin {
 // NOTE: Default glyph that is used for worker pawns.
 pub const DEFAULT_WORKER_PAWN_GLYPH: usize = 1;
 
-// NOTE: Amount of works to be recheched for every worker at once.
+// NOTE: Amount of works to be rechecked for every worker in a frame.
 pub const MAX_WORK_RECHECK_COUNT: usize = 20;
 
 // NOTE: Treshold for maximum number of accessible tasks for a pawn.
@@ -267,66 +267,73 @@ fn worker_behaviour(
             true
         };
 
-        if !active && tq.queue.is_empty() {
-            // NOTE: Find the nearest unoccupied task.
-            let mut index = -1;
-            let mut close = f32::MAX;
+        if active || !tq.queue.is_empty() {
+            continue;
+        }
 
-            // NOTE: Exhausted works
-            let mut occupied = vec![];
+        // NOTE: Find the nearest unoccupied task.
+        let mut index = -1;
+        let mut close = f32::MAX;
 
-            for (i, work) in worker.accessible.iter().enumerate() {
-                // NOTE: Validate the work.
-                match gw_validator.validate(&work.id) {
-                    Some(occupied) => {
-                        // NOTE: Skip the work if it's alrady occupied.
-                        if *occupied {
-                            continue;
-                        }
-                    },
-                    // NOTE: Handle the case of work no longer existing.
-                    None => {
-                        occupied.push(work.id.clone());
+        // NOTE: Exhausted works
+        let mut exhausted = vec![];
+
+        for (i, work) in worker.accessible.iter().enumerate() {
+            // NOTE: Validate the work.
+            match gw_validator.validate(&work.id) {
+                Some(occupied) => {
+                    // NOTE: Skip the work if it's alrady occupied.
+                    if *occupied {
                         continue;
                     }
-                }
-
-                // NOTE: Find the distance to the work.
-                let dist = distance_to_work(position, &work);
-
-                if dist < close {
-                    close = dist;
-                    index = i as i32;
+                },
+                // NOTE: Handle the case of work no longer existing.
+                None => {
+                    exhausted.push(work.id.clone());
+                    continue;
                 }
             }
 
-            // NOTE: If a work is available task it.
-            if index != -1 {
-                let work = worker.accessible.get_mut(index as usize).unwrap();
+            // NOTE: Find the distance to the work.
+            let dist = distance_to_work(position, &work);
 
-                // NOTE: Find the best nearest position around work.
-                let result = find_best_path_to_target(position, &work.position, &world);
+            if dist < close {
+                close = dist;
+                index = i as i32;
+            }
+        }
 
-                // NOTE: Send the required taks to worker.
-                if let Some(mt) = result {
-                    tq.queue.push_back(Task::Move(mt));
-                    tq.queue.push_back(work.task.clone());
-                } else {
-                    continue;
-                }
+        // NOTE: If a work is available task it.
+        if index != -1 {
+            let work = worker.accessible.get_mut(index as usize).unwrap();
+
+            // NOTE: Find the best path to nearest position around work.
+            let result = find_best_path_to_target(position, &work.position, &world);
+
+            // NOTE: Send the required taks to worker.
+            if let Some(mt) = result {
+                tq.queue.push_back(Task::Move(mt));
+                tq.queue.push_back(work.task.clone());
 
                 // NOTE: Mark the work as occupied.
                 gw_validator.set_occupied(&work.id, true);
-            }
+            } else {
+                // NOTE: Add work to the exhausted list to be removed from the accessible list.
+                exhausted.push(work.id.clone());
 
-            // NOTE: Remove exhausted works from the work list
-            let mut iter = 0;
-            while iter < worker.accessible.len() {
-                if occupied.contains(&worker.accessible[iter].id) {
-                    worker.accessible.remove(iter);
-                } else {
-                    iter += 1;
-                }
+                // NOTE: If no path is available, push the work to the inaccessible list.
+                let clone = work.clone();
+                worker.inaccessible.push(clone);
+            }
+        }
+
+        // NOTE: Remove exhausted works from the work list
+        let mut iter = 0;
+        while iter < worker.accessible.len() {
+            if exhausted.contains(&worker.accessible[iter].id) {
+                worker.accessible.remove(iter);
+            } else {
+                iter += 1;
             }
         }
     }
@@ -344,6 +351,8 @@ fn check_inaccessible_works(
             continue;
         }
 
+        // NOTE: Counter to keep track of how many works
+        //       have been reconsideret this frame.
         let mut counter = 0;
 
         let mut promote = vec![];
@@ -355,6 +364,7 @@ fn check_inaccessible_works(
             let work = &worker.inaccessible[i];
 
             if let None = gw_validator.validate(&work.id) {
+                // NOTE: Discard the work if it no longer exists.
                 invalid.push(work.id.clone());
             } else {
                 let result = find_best_path_to_target(
@@ -363,6 +373,7 @@ fn check_inaccessible_works(
         
                 match result {
                     Some(_) => {
+                        // NOTE: Promote the work if a path is available.
                         promote.push(work.id.clone());
                     },
                     None => {}
@@ -396,7 +407,7 @@ fn check_inaccessible_works(
             }
         }
 
-        // NOTE: Wrap the iterator to start if a cycle is complete.
+        // NOTE: Wrap the iterator to start if a recheck cycle is complete.
         if worker.iterator >= worker.inaccessible.len() {
             worker.iterator = 0;
         }
@@ -483,18 +494,10 @@ fn mine_tile_event(
     }
 
     // NOTE: Despawn the indicator entities with target positions.
-    let mut marked = vec![];
-
     for (entity, position) in &indicators {
-        if !targets.contains(position) {
-            continue;
+        if targets.contains(position) {
+            commands.entity(entity).despawn();
         }
-
-        marked.push(entity);
-    }
-
-    for e in marked {
-        commands.entity(e).despawn();
     }
 
     // NOTE: Change tiles with the same positions in the array.
@@ -511,10 +514,10 @@ fn mine_tile_event(
             continue;
         }
 
-        // NOTE: Remove target position from the vector
+        // NOTE: Remove target position from the vector,
+        //       to decrease total number of iterations.
         targets.remove(index as usize);
 
-        // NOTE: Change `TileState` to empty.
         tile.state = tile::TileState::Empty;
     }
 }

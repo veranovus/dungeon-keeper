@@ -67,32 +67,34 @@ fn select_pawns(
             _ => false,
         };
 
-        if valid {
-            // NOTE: Check if the result is in the right format.
-            let (position, size) = match e.result {
-                SelectionResult::Default(position, size) => {
-                    (position, size)
-                },
-                _ => {
-                    continue;
-                }
-            };
+        if !valid {
+            continue;
+        }
 
-            for (transform, mut selectable) in &mut query {
+        // NOTE: Check if the result is in the right format.
+        let (position, size) = match e.result {
+            SelectionResult::Default(position, size) => {
+                (position, size)
+            },
+            _ => {
+                continue;
+            }
+        };
 
-                // NOTE: Check if entity is in the square in both x and y coordinates.
-                let x = (transform.translation.x + globals::SPRITE_SIZE) > position.x
-                    && transform.translation.x < (position.x + size.x);
-                let y = (transform.translation.y + globals::SPRITE_SIZE) > position.y
-                    && transform.translation.y < (position.y + size.y);
-    
-                // NOTE: If it is simpy mark the entity as
-                //       selected and as not selected otherwise.
-                if x && y {
-                    selectable.selected = true;
-                } else {
-                    selectable.selected = false;
-                }
+        for (transform, mut selectable) in &mut query {
+
+            // NOTE: Check if entity is in the square in both x and y coordinates.
+            let x = (transform.translation.x + globals::SPRITE_SIZE) > position.x
+                && transform.translation.x < (position.x + size.x);
+            let y = (transform.translation.y + globals::SPRITE_SIZE) > position.y
+                && transform.translation.y < (position.y + size.y);
+
+            // NOTE: If it is simpy mark the entity as
+            //       selected and as not selected otherwise.
+            if x && y {
+                selectable.selected = true;
+            } else {
+                selectable.selected = false;
             }
         }
     }
@@ -124,28 +126,25 @@ fn move_order(
 
             let result = core::pawn_find_path(*position, target, &world);
 
-            match result {
-                None => {
-                    info!("Ignored move order, no possible path for given location.");
-                },
-                Some((mut path, _cost)) => {
-                    // NOTE: Remove the starting position since
-                    //       pawn is already on that tile.
-                    path.remove(0);
+            if let Some((mut path, _)) = result {
+                // NOTE: Remove the starting position since pawn is already on that tile.
+                path.remove(0);
 
-                    // NOTE: Convert path into a VecDeque from Vec, and
-                    //       push the task to the queue as the first task.
-                    task_queue.queue.push_front(Task::Move(MoveTask {
-                        path: VecDeque::from(path),
-                        target,
-                    }));
-                },
+                // NOTE: Convert path into a VecDeque from Vec, and
+                //       push the task to the queue as the first task.
+                task_queue.queue.push_front(Task::Move(MoveTask {
+                    path: VecDeque::from(path),
+                    target,
+                }));
+            } else {
+                info!("Ignored move order, no possible path for given location.");
             }
         }
     }
 }
 
 // NOTE: Marks the tiles under cursor or in the selection's are to be mined.
+// TODO: Refactor this mess, at some point...
 fn mine_order(
     mut commands: Commands,
     mut world: ResMut<world::World>,
