@@ -2,6 +2,8 @@
 
 A Tower Defense, Dungeon Management kind of game, but also inspired by Dwarf Fortress? Even I don't know where this game will go over time.
 
+> `2023.08.26:` This project is currently on hold, and future of the project is uncertain.
+
 > Version 0.2.0.9
 
 ## Changelog
