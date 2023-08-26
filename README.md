@@ -6,8 +6,8 @@ A Tower Defense, Dungeon Management kind of game, but also inspired by Dwarf For
 
 > `2023.08.26:` This project is currently on hold, and future of the project is uncertain.
 
-<img width="912" alt="dungeon-keeper-0" src="https://github.com/veranovus/dungeon-keeper/assets/git/dungeon-keeper-0.png">
-<img width="912" alt="dungeon-keeper-1" src="https://github.com/veranovus/dungeon-keeper/assets/git/dungeon-keeper-1.png">
+<img width="912" alt="dungeon-keeper-0" src="assets/git/dungeon-keeper-0.png">
+<img width="912" alt="dungeon-keeper-1" src="assets/git/dungeon-keeper-1.png">
 
 ## Changelog
 
