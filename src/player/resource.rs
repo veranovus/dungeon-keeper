@@ -10,7 +10,6 @@ pub mod prelude {
 }
 
 // TODO: Add necessery comments.
-
 pub struct ResourcePlugin;
 
 impl Plugin for ResourcePlugin {
